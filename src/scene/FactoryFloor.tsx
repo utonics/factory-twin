@@ -3,6 +3,7 @@ import { useEffect, useMemo } from 'react'
 import { BufferAttribute, BufferGeometry, DoubleSide } from 'three'
 import type { Vec2 } from '../domain/types'
 import { simulation } from '../runtime'
+import { ChargingBays } from './ChargingBays'
 import { StaticInstances, type InstanceTransform } from './StaticInstances'
 import { COLORS } from './theme'
 
@@ -99,7 +100,6 @@ export function FactoryFloor() {
   const lane = useMemo(() => ribbonGeometry(path.points, LANE_WIDTH), [path])
   useEffect(() => () => lane.dispose(), [lane])
   const laneEdges = useMemo(() => [offsetPath(path.points, LANE_WIDTH / 2), offsetPath(path.points, -LANE_WIDTH / 2)], [path])
-  const park = layout.agv.stops.find((s) => s.kind === 'park')!.point
 
   const pillars = useMemo(() => {
     const list: InstanceTransform[] = []
@@ -146,7 +146,6 @@ export function FactoryFloor() {
         <Line key={line.id} points={rect((line.xStart + line.xEnd) / 2, line.z, line.xEnd - line.xStart + 4, 7.2)} color={COLORS.marking} lineWidth={2} />
       ))}
       <Line points={rect(33.5, 11.75, 9.5, 4.8)} color={COLORS.marking} lineWidth={2} />
-      <Line points={rect(park.x, park.z + 2.2, 4, 2)} color={COLORS.ok} lineWidth={2} />
 
       {/* 북·서측 벽(남·동측은 시야 확보를 위해 생략) */}
       <mesh position={[cx, 2.5, floor.minZ - 0.15]} castShadow receiveShadow>
@@ -170,21 +169,7 @@ export function FactoryFloor() {
         <meshStandardMaterial color={COLORS.white} />
       </StaticInstances>
 
-      {/* 충전 스테이션 */}
-      <group position={[park.x, 0, park.z + 2.4]}>
-        {[-1, 1].map((side) => (
-          <group key={side} position={[side * 1.1, 0, 0]}>
-            <mesh position={[0, 0.6, 0]} castShadow>
-              <boxGeometry args={[0.7, 1.2, 0.5]} />
-              <meshStandardMaterial color={COLORS.white} />
-            </mesh>
-            <mesh position={[0, 0.85, -0.26]}>
-              <planeGeometry args={[0.4, 0.25]} />
-              <meshStandardMaterial color="#0e2a1c" emissive={COLORS.ok} emissiveIntensity={0.8} />
-            </mesh>
-          </group>
-        ))}
-      </group>
+      <ChargingBays />
 
       {/* 외곽 조경 */}
       <Trees />

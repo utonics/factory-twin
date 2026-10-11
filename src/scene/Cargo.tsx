@@ -26,7 +26,7 @@ interface PalletInstance {
  */
 function collectPallets(pool: PalletInstance[]): number {
   let count = 0
-  const { state, layout, path } = simulation
+  const { state, layout } = simulation
   const push = (x: number, z: number, units: number, kind: CargoKind, y = 0, rotY = 0) => {
     const p = pool[count] ?? (pool[count] = { x: 0, y: 0, z: 0, rotY: 0, units: 0, kind })
     p.x = x
@@ -58,7 +58,7 @@ function collectPallets(pool: PalletInstance[]): number {
   for (const agv of state.agvs) {
     const kind = displayedCargo(agv)
     if (!kind) continue
-    const pose = path.pose(agv.s)
+    const pose = simulation.agvPose(agv)
     push(pose.x, pose.z, 8, kind, AGV_DECK_Y + liftAmount(agv) * AGV_LIFT_STROKE, -pose.heading)
   }
 

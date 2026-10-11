@@ -10,7 +10,7 @@ export type StationStatus = 'idle' | 'processing' | 'blocked' | 'down'
 export type ItemStage = 'raw' | 'machined' | 'welded' | 'inspected' | 'packed'
 export type CargoKind = 'raw' | 'finished'
 export type AgvStatus = 'moving' | 'queued' | 'loading' | 'unloading' | 'waiting' | 'charging'
-export type AgvStopKind = 'warehouse' | 'lineInput' | 'lineOutput' | 'shipping' | 'park'
+export type AgvStopKind = 'warehouse' | 'lineInput' | 'lineOutput' | 'shipping'
 export type TruckStatus = 'away' | 'arriving' | 'docked' | 'departing'
 export type EventLevel = 'info' | 'warn' | 'error'
 
@@ -66,6 +66,24 @@ export interface AgvStopSpec {
   point: Vec2
 }
 
+/** 순환로 밖 충전 베이. 본선에서 분기해 들어가 충전하고 다시 합류한다(드라이브스루형). */
+export interface ChargingBaySpec {
+  id: string
+  name: string
+  /** 베이 중심 x 좌표 */
+  x: number
+}
+
+export interface ChargingSpec {
+  /** 분기·합류하는 본선 차선의 z 좌표 */
+  laneZ: number
+  /** 베이가 놓인 z 좌표 */
+  bayZ: number
+  /** 베이 중심에서 분기점·합류점까지 x 거리 */
+  halfSpan: number
+  bays: ChargingBaySpec[]
+}
+
 export interface AgvSpec {
   id: string
   name: string
@@ -92,6 +110,7 @@ export interface FactoryLayout {
     accel: number
     safeGap: number
     stops: AgvStopSpec[]
+    charging: ChargingSpec
     fleet: AgvSpec[]
   }
   warehouse: {
@@ -170,8 +189,14 @@ export interface LineState {
 export interface AgvState {
   id: string
   name: string
-  /** 순환 경로 위 위치(호 길이) */
+  /** 순환 경로 위 위치(호 길이). 분기선에 있을 때는 분기점 위치에 머문다 */
   s: number
+  /** 본선(loop) 또는 충전 분기선(spur) 주행 중 */
+  track: 'loop' | 'spur'
+  /** 예약·사용 중인 충전 베이 번호 */
+  bay: number | null
+  /** 분기선 위 위치(호 길이) */
+  spurS: number
   speed: number
   status: AgvStatus
   cargo: CargoKind | null

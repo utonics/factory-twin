@@ -11,7 +11,8 @@ interface Area {
   distance: number
 }
 
-const park = factoryLayout.agv.stops.find((s) => s.kind === 'park')!.point
+const { charging } = factoryLayout.agv
+const chargingX = charging.bays.reduce((sum, b) => sum + b.x, 0) / charging.bays.length
 const wh = factoryLayout.warehouse
 const line = (id: string) => factoryLayout.lines.find((l) => l.id === id)!
 
@@ -23,7 +24,7 @@ export const AREAS: Area[] = [
   { id: 'L2', label: line('L2').name, target: [1, 0, line('L2').z], distance: 44 },
   // 오른쪽 패널에 가리지 않도록 시점 중심을 구역보다 약간 동쪽·남쪽에 둔다
   { id: 'shipping', label: '출하장', target: [42, 0, 17], distance: 56 },
-  { id: 'charging', label: 'AGV 충전소', target: [park.x, 0, park.z + 1], distance: 26 },
+  { id: 'charging', label: 'AGV 충전소', target: [chargingX, 0, charging.bayZ - 0.5], distance: 30 },
 ]
 
 /** 기본 시점의 카메라 방향(시점 중심 → 카메라) */

@@ -19,7 +19,7 @@ import {
   type TruckStatus,
 } from '../domain/types'
 import { lineSegments, truckDockedX, TRUCK_OFFSCREEN_X } from './geometry'
-import { LoopPath } from './loopPath'
+import { LoopPath, PolylinePath, type PathPose } from './loopPath'
 import { createRng } from './random'
 
 const STAGE_AFTER: Record<StationKind, ItemStage> = {
@@ -40,6 +40,9 @@ const AGV_DRAIN_PER_SEC = 0.06
 const AGV_CHARGE_PER_SEC = 1.5
 const AGV_LOW_BATTERY = 30
 const AGV_RESUME_BATTERY = 60
+/** 충전 분기선 주행 속도와, 합류 시 뒤에서 오는 AGV와 확보할 추가 여유(제동 거리) */
+const SPUR_SPEED = 1.5
+const MERGE_CLEARANCE = 3
 /** 이 거리 안이면 '이미 지난 정류장'으로 보고 다음 정류장을 찾는다 */
 const STOP_PASSED = 1e-3
 /** 정차 예정 정류장까지 이 거리 안이면 도착 처리. STOP_PASSED보다 커야 정류장을 놓치지 않는다. */
@@ -79,6 +82,19 @@ interface LineRuntime {
   segments: Segment[]
 }
 
+interface ChargingBay {
+  name: string
+  /** 분기점 → 베이 → 합류점 경로 */
+  path: PolylinePath
+  /** 분기선 위 베이(충전 위치) 지점 */
+  stopAt: number
+  /** 본선 위 분기점·합류점 */
+  divergeS: number
+  mergeS: number
+  /** 예약·사용 중인 AGV(분기 전 예약부터 합류 완료까지) */
+  occupant: string | null
+}
+
 export interface SimulationOptions {
   seed?: number
   /** 시작 전에 미리 돌려 둘 시간(초). 화면이 처음부터 가동 중인 상태로 보이게 한다. */
@@ -96,7 +112,10 @@ export class FactorySimulation {
   readonly state: FactoryState
 
   private readonly rng: () => number
+  /** 외부 입력(고객 주문·공급사 입고) 전용 난수. 공장 내부 동작이 바뀌어도 같은 시드면 같은 주문·입고가 들어온다 */
+  private readonly demandRng: () => number
   private readonly runtimes: LineRuntime[]
+  private readonly bays: ChargingBay[]
   private readonly stationSpecs: Record<string, StationSpec> = {}
   private nextItemId = 1
   private nextEventId = 1
@@ -108,8 +127,27 @@ export class FactorySimulation {
   constructor(layout: FactoryLayout, options: SimulationOptions = {}) {
     this.layout = layout
     this.rng = createRng(options.seed ?? 20261011)
+    this.demandRng = createRng(((options.seed ?? 20261011) ^ 0x5bd1e995) >>> 0)
     this.path = new LoopPath(layout.agv.corners, layout.agv.cornerRadius)
     this.stopS = Object.fromEntries(layout.agv.stops.map((stop) => [stop.id, this.path.project(stop.point)]))
+
+    const charging = layout.agv.charging
+    this.bays = charging.bays.map((bay) => {
+      const path = new PolylinePath([
+        { x: bay.x + charging.halfSpan, z: charging.laneZ },
+        { x: bay.x + 0.9, z: charging.bayZ },
+        { x: bay.x - 0.9, z: charging.bayZ },
+        { x: bay.x - charging.halfSpan, z: charging.laneZ },
+      ])
+      return {
+        name: bay.name,
+        path,
+        stopAt: path.length / 2,
+        divergeS: this.path.project(path.points[0]),
+        mergeS: this.path.project(path.points[path.points.length - 1]),
+        occupant: null,
+      }
+    })
 
     this.runtimes = layout.lines.map((spec) => ({
       spec,
@@ -157,6 +195,9 @@ export class FactorySimulation {
       id: spec.id,
       name: spec.name,
       s: this.path.length * spec.startAt,
+      track: 'loop',
+      bay: null,
+      spurS: 0,
       speed: 0,
       status: 'moving',
       cargo: null,
@@ -195,7 +236,7 @@ export class FactorySimulation {
       },
       warehouse: {
         stock: layout.warehouse.initialStock,
-        nextInboundAt: this.uniform(INBOUND_INTERVAL),
+        nextInboundAt: this.uniform(INBOUND_INTERVAL, this.demandRng),
         expedited: false,
       },
       orders: [],
@@ -203,10 +244,19 @@ export class FactorySimulation {
     }
     // 시작 시점에 이미 접수된 오더 몇 건(라인이 채워지는 시간을 감안해 납기 여유를 더 줌)
     for (let i = 0; i < 4; i++) this.createOrder(INITIAL_ORDER_EXTRA_LEAD)
-    this.nextOrderAt = this.exponential(ORDER_MEAN_INTERVAL)
+    this.nextOrderAt = this.exponential(ORDER_MEAN_INTERVAL, this.demandRng)
 
     const warmup = options.warmup ?? 0
     if (warmup > 0) this.step(warmup)
+  }
+
+  /** AGV 화면 위치: 본선이면 순환 경로, 충전 분기선이면 분기선 경로 */
+  agvPose(agv: AgvState): PathPose {
+    return agv.track === 'spur' && agv.bay !== null ? this.bays[agv.bay].path.pose(agv.spurS) : this.path.pose(agv.s)
+  }
+
+  chargingBayName(index: number): string {
+    return this.bays[index].name
   }
 
   /** 공장 이벤트 구독. 해제 함수를 돌려준다. */
@@ -239,12 +289,12 @@ export class FactorySimulation {
     this.tickOrders()
   }
 
-  private uniform([min, max]: number[]): number {
-    return min + this.rng() * (max - min)
+  private uniform([min, max]: number[], rng = this.rng): number {
+    return min + rng() * (max - min)
   }
 
-  private exponential(mean: number): number {
-    return -Math.log(1 - this.rng()) * mean
+  private exponential(mean: number, rng = this.rng): number {
+    return -Math.log(1 - rng()) * mean
   }
 
   private log(level: EventLevel, sourceId: string, message: string): void {
@@ -458,12 +508,16 @@ export class FactorySimulation {
         case 'waiting':
           if (this.state.shipping.staged < this.layout.shipping.stagingCapacity) this.beginTask(agv, 'unloading')
           break
-        case 'charging':
+        case 'charging': {
           agv.battery = Math.min(100, agv.battery + AGV_CHARGE_PER_SEC * h)
-          if (agv.battery >= agv.chargeUntil && this.transportDemand() > 0) this.depart(agv)
+          // 일이 생기면 출발. 쉬러 온 AGV는 배터리 부족 AGV가 베이를 못 구하면 자리를 비켜 준다
+          const yieldBay = agv.chargeUntil === 0 && this.someoneNeedsBay()
+          if (agv.battery >= agv.chargeUntil && (this.transportDemand() > 0 || yieldBay)) this.depart(agv)
           break
+        }
         default:
-          this.drive(agv, h)
+          if (agv.track === 'spur') this.driveSpur(agv, h)
+          else this.drive(agv, h)
       }
     }
   }
@@ -481,6 +535,101 @@ export class FactorySimulation {
     return { stop: best, distance: bestDistance }
   }
 
+  // ---------------------------------------------------------------- 충전 분기선
+
+  /** 빈 손이고, 배터리가 부족하거나 할 일이 없으면 충전 베이로 */
+  private needsCharge(agv: AgvState): boolean {
+    return agv.cargo === null && agv.cargoLineId === null && (agv.battery < AGV_LOW_BATTERY || this.transportDemand() === 0)
+  }
+
+  /** 배터리가 부족한데 베이를 못 구한 AGV가 본선에 있는지 */
+  private someoneNeedsBay(): boolean {
+    return this.state.agvs.some((a) => a.track === 'loop' && a.bay === null && a.battery < AGV_LOW_BATTERY)
+  }
+
+  /** 분기점에 다가가면 빈 베이를 예약하고, 충전이 더는 필요 없으면 예약을 푼다 */
+  private updateBayReservation(agv: AgvState): void {
+    if (agv.bay !== null) {
+      if (!this.needsCharge(agv)) {
+        this.bays[agv.bay].occupant = null
+        agv.bay = null
+      }
+      return
+    }
+    if (!this.needsCharge(agv)) return
+    for (let i = 0; i < this.bays.length; i++) {
+      const bay = this.bays[i]
+      if (bay.occupant !== null) continue
+      const d = this.path.forwardDistance(agv.s, bay.divergeS)
+      if (d > STOP_PASSED && d < AGV_DECISION_DISTANCE) {
+        bay.occupant = agv.id
+        agv.bay = i
+        return
+      }
+    }
+  }
+
+  /** 합류점 앞뒤 본선에 안전거리가 있는지(뒤쪽은 제동 거리만큼 더) */
+  private canMerge(bay: ChargingBay): boolean {
+    const { safeGap } = this.layout.agv
+    for (const other of this.state.agvs) {
+      if (other.track !== 'loop') continue
+      if (this.path.forwardDistance(bay.mergeS, other.s) < safeGap) return false
+      if (this.path.forwardDistance(other.s, bay.mergeS) < safeGap + MERGE_CLEARANCE) return false
+    }
+    return true
+  }
+
+  private driveSpur(agv: AgvState, h: number): void {
+    const { accel } = this.layout.agv
+    const bay = this.bays[agv.bay!]
+    const entering = agv.spurS < bay.stopAt - 1e-6
+    const end = entering ? bay.stopAt : bay.path.length
+    const distance = end - agv.spurS
+
+    if (!entering && distance <= STOP_ARRIVE) {
+      // 합류점: 본선이 비어야 진입. 기다리는 동안 본선은 막지 않는다
+      agv.speed = 0
+      if (!this.canMerge(bay)) {
+        agv.status = 'queued'
+        return
+      }
+      agv.track = 'loop'
+      agv.s = bay.mergeS
+      agv.bay = null
+      bay.occupant = null
+      agv.status = 'moving'
+      return
+    }
+
+    const target = Math.min(SPUR_SPEED, Math.max(0.4, Math.sqrt(2 * accel * distance)))
+    agv.speed = agv.speed < target ? Math.min(target, agv.speed + accel * h) : Math.max(target, agv.speed - accel * 2 * h)
+    const move = agv.speed * h
+    if (move > 0) agv.battery = Math.max(0, agv.battery - AGV_DRAIN_PER_SEC * h)
+    agv.status = 'moving'
+
+    if (move >= distance - STOP_ARRIVE) {
+      agv.odometer += distance
+      agv.spurS = end
+      if (entering) {
+        agv.speed = 0
+        this.startCharging(agv)
+      }
+      return
+    }
+    agv.spurS += move
+    agv.odometer += move
+  }
+
+  private startCharging(agv: AgvState): void {
+    agv.status = 'charging'
+    // 배터리 부족으로 들어오면 일정 수준까지 충전, 일이 없어 쉬러 온 경우는 수요가 생기면 바로 출발
+    agv.chargeUntil = agv.battery < AGV_LOW_BATTERY ? AGV_RESUME_BATTERY : 0
+    if (agv.chargeUntil > 0) this.log('warn', agv.id, `${agv.name} 배터리 부족, ${this.bays[agv.bay!].name} 충전 시작`)
+  }
+
+  // ---------------------------------------------------------------- 본선 주행
+
   private drive(agv: AgvState, h: number): void {
     const cfg = this.layout.agv
     const { stop, distance } = this.nextStop(agv)
@@ -489,10 +638,12 @@ export class FactorySimulation {
       agv.decidedStopId = stop.id
       agv.plannedStopId = this.decideStop(agv, stop) ? stop.id : null
     }
+    this.updateBayReservation(agv)
 
+    // 충전 분기선에 있는 AGV는 본선을 막지 않는다
     let gap = Infinity
     for (const other of this.state.agvs) {
-      if (other === agv) continue
+      if (other === agv || other.track !== 'loop') continue
       const d = this.path.forwardDistance(agv.s, other.s)
       if (d > 0 && d < gap) gap = d
     }
@@ -500,6 +651,9 @@ export class FactorySimulation {
     const stopping = agv.plannedStopId === stop.id
     let target = Math.min(cfg.speed, Math.sqrt(Math.max(0, 2 * cfg.accel * (gap - cfg.safeGap))))
     if (stopping) target = Math.min(target, Math.max(0.5, Math.sqrt(2 * cfg.accel * distance)))
+    // 예약한 베이로 빠지려면 분기점에서 분기선 속도까지 감속
+    const divergeDistance = agv.bay !== null ? this.path.forwardDistance(agv.s, this.bays[agv.bay].divergeS) : Infinity
+    if (agv.bay !== null) target = Math.min(target, Math.sqrt(SPUR_SPEED ** 2 + 2 * cfg.accel * divergeDistance))
     agv.speed = agv.speed < target ? Math.min(target, agv.speed + cfg.accel * h) : Math.max(target, agv.speed - cfg.accel * 2 * h)
 
     let move = agv.speed * h
@@ -514,6 +668,16 @@ export class FactorySimulation {
       agv.s = this.stopS[stop.id]
       agv.speed = 0
       this.arrive(agv, stop)
+      return
+    }
+
+    if (agv.bay !== null && move >= divergeDistance - STOP_ARRIVE) {
+      // 분기점 도달: 충전 분기선으로 진입
+      agv.odometer += divergeDistance
+      agv.s = this.bays[agv.bay].divergeS
+      agv.track = 'spur'
+      agv.spurS = 0
+      agv.status = 'moving'
       return
     }
 
@@ -557,8 +721,6 @@ export class FactorySimulation {
       }
       case 'shipping':
         return agv.cargo === 'finished'
-      case 'park':
-        return agv.cargo === null && agv.cargoLineId === null && (agv.battery < AGV_LOW_BATTERY || this.transportDemand() === 0)
     }
   }
 
@@ -576,12 +738,6 @@ export class FactorySimulation {
       case 'shipping':
         if (this.state.shipping.staged < this.layout.shipping.stagingCapacity) this.beginTask(agv, 'unloading')
         else agv.status = 'waiting'
-        break
-      case 'park':
-        agv.status = 'charging'
-        // 배터리 부족으로 들어오면 일정 수준까지 충전, 일이 없어 쉬러 온 경우는 수요가 생기면 바로 출발
-        agv.chargeUntil = agv.battery < AGV_LOW_BATTERY ? AGV_RESUME_BATTERY : 0
-        if (agv.chargeUntil > 0) this.log('warn', agv.id, `${agv.name} 배터리 부족, 충전 시작`)
         break
     }
   }
@@ -620,8 +776,6 @@ export class FactorySimulation {
         agv.cargo = null
         agv.cargoLineId = null
         agv.deliveries++
-        break
-      case 'park':
         break
     }
     this.depart(agv)
@@ -717,11 +871,11 @@ export class FactorySimulation {
     const now = this.state.time
     const order: OrderState = {
       id: `SO-${++this.orderSeq}`,
-      customer: CUSTOMERS[Math.floor(this.rng() * CUSTOMERS.length)],
-      pallets: Math.round(this.uniform(ORDER_PALLETS)),
+      customer: CUSTOMERS[Math.floor(this.demandRng() * CUSTOMERS.length)],
+      pallets: Math.round(this.uniform(ORDER_PALLETS, this.demandRng)),
       shipped: 0,
       createdAt: now,
-      dueAt: now + extraLead + this.uniform(ORDER_LEAD_TIME),
+      dueAt: now + extraLead + this.uniform(ORDER_LEAD_TIME, this.demandRng),
     }
     this.state.orders.push(order)
     this.emit({ type: 'orderCreated', ts: now, orderId: order.id, customer: order.customer, pallets: order.pallets, dueAt: order.dueAt })
@@ -730,7 +884,7 @@ export class FactorySimulation {
   private tickOrders(): void {
     while (this.state.time >= this.nextOrderAt) {
       this.createOrder()
-      this.nextOrderAt += this.exponential(ORDER_MEAN_INTERVAL)
+      this.nextOrderAt += this.exponential(ORDER_MEAN_INTERVAL, this.demandRng)
     }
   }
 
@@ -763,11 +917,11 @@ export class FactorySimulation {
       this.log('warn', 'WH', `원자재 재고 ${wh.stock}팔레트, 긴급 발주`)
     }
     if (now < wh.nextInboundAt) return
-    const pallets = Math.min(this.layout.warehouse.capacity - wh.stock, Math.round(this.uniform(INBOUND_PALLETS)))
+    const pallets = Math.min(this.layout.warehouse.capacity - wh.stock, Math.round(this.uniform(INBOUND_PALLETS, this.demandRng)))
     wh.stock += pallets
     this.emit({ type: 'materialReceived', ts: now, pallets, expedited: wh.expedited })
     this.log('info', 'WH', `원자재 ${pallets}팔레트 입고${wh.expedited ? ' (긴급)' : ''}`)
     wh.expedited = false
-    wh.nextInboundAt = now + this.uniform(INBOUND_INTERVAL)
+    wh.nextInboundAt = now + this.uniform(INBOUND_INTERVAL, this.demandRng)
   }
 }

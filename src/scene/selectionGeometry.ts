@@ -9,10 +9,10 @@ export interface SelectionFrame {
 
 /** 선택 대상의 현재 위치·회전. 움직이는 AGV·트럭도 매 프레임 추적한다. */
 export function locateSelection(id: string): { x: number; z: number; rotY: number } | null {
-  const { layout, state, path } = simulation
+  const { layout, state } = simulation
   const agv = state.agvs.find((a) => a.id === id)
   if (agv) {
-    const pose = path.pose(agv.s)
+    const pose = simulation.agvPose(agv)
     return { x: pose.x, z: pose.z, rotY: -pose.heading }
   }
   if (id === 'WH') {

@@ -27,7 +27,7 @@ function AgvModel({ index }: { index: number }) {
 
   useFrame(({ clock }) => {
     const agv = simulation.state.agvs[index]
-    const pose = simulation.path.pose(agv.s)
+    const pose = simulation.agvPose(agv)
     if (body.current) {
       body.current.position.set(pose.x, 0, pose.z)
       body.current.rotation.y = -pose.heading

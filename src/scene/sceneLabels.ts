@@ -9,13 +9,14 @@ interface ZoneLabel {
   position: [number, number, number]
 }
 
-const park = factoryLayout.agv.stops.find((s) => s.kind === 'park')!.point
+const { charging } = factoryLayout.agv
+const chargingX = charging.bays.reduce((sum, b) => sum + b.x, 0) / charging.bays.length
 
 export const ZONE_LABELS: ZoneLabel[] = [
   { id: 'zone-warehouse', text: '자재창고', position: [-35.5, 6, -21] },
   ...factoryLayout.lines.map((line) => ({ id: `zone-${line.id}`, text: line.name, position: [line.xStart - 1, 0.2, line.z - 3.1] as [number, number, number] })),
   { id: 'zone-shipping', text: '출하 적치장', position: [33.5, 0.2, 9] },
-  { id: 'zone-charging', text: 'AGV 충전', position: [park.x, 1.8, park.z + 2.4] },
+  { id: 'zone-charging', text: 'AGV 충전', position: [chargingX, 0.2, charging.bayZ + 2.8] },
 ]
 
 export const SELECTION_LABEL_ID = 'selection'

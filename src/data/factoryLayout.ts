@@ -73,8 +73,18 @@ export const factoryLayout: FactoryLayout = {
       { id: 'ST-L1-OUT', kind: 'lineOutput', name: '1라인 배출구', lineId: 'L1', point: { x: 26, z: -8 } },
       { id: 'ST-L2-OUT', kind: 'lineOutput', name: '2라인 배출구', lineId: 'L2', point: { x: 26, z: 8 } },
       { id: 'ST-SHIP', kind: 'shipping', name: '출하 적치장', point: { x: 26, z: 15 } },
-      { id: 'ST-PARK', kind: 'park', name: '충전 스테이션', point: { x: 2, z: 20 } },
     ],
+    // 남측 차선(서쪽으로 진행) 아래에 드라이브스루형 충전 베이 3칸
+    charging: {
+      laneZ: 20,
+      bayZ: 22.6,
+      halfSpan: 2.2,
+      bays: [
+        { id: 'CH-1', name: '충전 베이 1', x: 7 },
+        { id: 'CH-2', name: '충전 베이 2', x: 2 },
+        { id: 'CH-3', name: '충전 베이 3', x: -3 },
+      ],
+    },
     fleet: [
       { id: 'AGV-01', name: 'AGV-01', startAt: 0.02 },
       { id: 'AGV-02', name: 'AGV-02', startAt: 0.22 },

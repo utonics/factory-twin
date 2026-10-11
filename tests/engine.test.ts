@@ -53,14 +53,15 @@ describe('FactorySimulation', () => {
     }
   })
 
-  it('AGV끼리 안전 거리를 침범하지 않는다', () => {
+  it('본선 AGV끼리 안전 거리를 침범하지 않는다(합류 순간 포함)', () => {
     const sim = new FactorySimulation(factoryLayout, { seed: 5 })
     const minGap = factoryLayout.agv.safeGap * 0.8 - 1e-6
-    for (let t = 0; t < 1200; t++) {
-      sim.step(0.5)
-      const agvs = sim.state.agvs
-      for (const a of agvs) {
-        for (const b of agvs) {
+    for (let t = 0; t < 36000; t++) {
+      sim.step(0.1)
+      // 충전 분기선에 들어간 AGV는 본선을 떠난 상태라 비교에서 제외
+      const onLoop = sim.state.agvs.filter((a) => a.track === 'loop')
+      for (const a of onLoop) {
+        for (const b of onLoop) {
           if (a === b) continue
           expect(sim.path.forwardDistance(a.s, b.s)).toBeGreaterThanOrEqual(minGap)
         }
@@ -86,5 +87,39 @@ describe('AGV 정차', () => {
       for (const agv of sim.state.agvs) expect(agv.battery).toBeGreaterThan(5)
     }
     for (const agv of sim.state.agvs) expect(agv.deliveries).toBeGreaterThan(40)
+  })
+})
+
+describe('충전 분기선', () => {
+  it('충전은 분기선에서만 하고, 한 베이에는 한 대만 들어가며, 충전 후 본선에 다시 합류한다', () => {
+    const sim = new FactorySimulation(factoryLayout, { seed: 2 })
+    let entered = 0
+    let merged = 0
+    const track = new Map(sim.state.agvs.map((a) => [a.id, a.track]))
+    for (let t = 0; t < 4 * 3600; t++) {
+      sim.step(1)
+      const bays = new Set<number>()
+      for (const a of sim.state.agvs) {
+        if (a.status === 'charging') expect(a.track).toBe('spur')
+        if (a.bay !== null) {
+          expect(bays.has(a.bay)).toBe(false)
+          bays.add(a.bay)
+        }
+        const prev = track.get(a.id)
+        if (prev === 'loop' && a.track === 'spur') entered++
+        if (prev === 'spur' && a.track === 'loop') merged++
+        track.set(a.id, a.track)
+      }
+    }
+    expect(entered).toBeGreaterThan(10)
+    expect(merged).toBeGreaterThan(10)
+  })
+
+  it('배터리가 바닥나지 않는다', () => {
+    const sim = new FactorySimulation(factoryLayout, { seed: 3 })
+    for (let t = 0; t < 4 * 3600; t += 5) {
+      sim.step(5)
+      for (const a of sim.state.agvs) expect(a.battery).toBeGreaterThan(15)
+    }
   })
 })

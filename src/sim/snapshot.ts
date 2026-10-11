@@ -1,4 +1,5 @@
 import type {
+  AgvState,
   AgvStatus,
   CargoKind,
   FactoryEvent,
@@ -102,9 +103,14 @@ export interface FactorySnapshot {
   events: FactoryEvent[]
 }
 
-function agvTask(sim: FactorySimulation, cargo: CargoKind | null, cargoLineId: string | null, status: AgvStatus): string {
+function agvTask(sim: FactorySimulation, agv: AgvState): string {
+  const { cargo, cargoLineId, status } = agv
   const lineName = (id: string | null) => sim.layout.lines.find((l) => l.id === id)?.name ?? ''
-  if (status === 'charging') return '충전 스테이션 대기'
+  if (agv.track === 'spur') {
+    if (status === 'charging') return agv.chargeUntil > 0 ? `배터리 충전 (${agv.chargeUntil}%까지)` : '충전 베이 대기(작업 없음)'
+    return status === 'queued' ? '본선 합류 대기' : '충전 베이 진출입'
+  }
+  if (agv.bay !== null) return `${sim.chargingBayName(agv.bay)}로 이동`
   if (cargo === 'raw') return `원자재 → ${lineName(cargoLineId)} 투입구`
   if (cargo === 'finished') return `완제품 → 출하 적치장`
   if (cargoLineId) {
@@ -152,8 +158,8 @@ export function createSnapshot(sim: FactorySimulation): FactorySnapshot {
     speed: a.speed,
     odometer: a.odometer,
     deliveries: a.deliveries,
-    stopName: stopName(a.currentStopId),
-    task: agvTask(sim, a.cargo, a.cargoLineId, a.status),
+    stopName: a.track === 'spur' && a.bay !== null ? sim.chargingBayName(a.bay) : stopName(a.currentStopId),
+    task: agvTask(sim, a),
   }))
 
   const lines: LineSnapshot[] = layout.lines.map((spec) => {

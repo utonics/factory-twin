@@ -100,3 +100,30 @@ function roundCorners(corners: Vec2[], radius: number, arcSegments: number): Vec
   }
   return out
 }
+
+/** 열린 경로(충전 분기선처럼 시작과 끝이 있는 길). 호 길이(s)로 위치를 조회한다. */
+export class PolylinePath {
+  readonly cumulative: number[]
+  readonly length: number
+
+  constructor(readonly points: Vec2[]) {
+    this.cumulative = [0]
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1]
+      const b = points[i]
+      this.cumulative.push(this.cumulative[i - 1] + Math.hypot(b.x - a.x, b.z - a.z))
+    }
+    this.length = this.cumulative[points.length - 1]
+  }
+
+  pose(s: number): PathPose {
+    const t = Math.min(this.length, Math.max(0, s))
+    let i = 0
+    while (i < this.points.length - 2 && this.cumulative[i + 1] <= t) i++
+    const a = this.points[i]
+    const b = this.points[i + 1]
+    const segLen = this.cumulative[i + 1] - this.cumulative[i]
+    const f = segLen > 0 ? (t - this.cumulative[i]) / segLen : 0
+    return { x: a.x + (b.x - a.x) * f, z: a.z + (b.z - a.z) * f, heading: Math.atan2(b.z - a.z, b.x - a.x) }
+  }
+}
