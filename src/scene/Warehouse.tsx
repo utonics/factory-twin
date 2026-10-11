@@ -1,0 +1,100 @@
+import { useLayoutEffect, useMemo, useRef } from 'react'
+import { BoxGeometry, Object3D, type InstancedMesh } from 'three'
+import { simulation } from '../runtime'
+import { createRng } from '../sim/random'
+import { COLORS } from './theme'
+
+const ROW_XS = [-40.5, -36, -31.5]
+const BAY = 2.4
+const LEVELS = [0.15, 1.75, 3.35]
+const DEPTH = 1.3
+const HEIGHT = 4.8
+
+interface RackParts {
+  uprights: [number, number, number][]
+  beams: { x: number; y: number; z: number; length: number }[]
+  loads: [number, number, number][]
+}
+
+function buildRacks(): RackParts {
+  const { minZ, maxZ } = simulation.layout.warehouse
+  const rng = createRng(4242)
+  const parts: RackParts = { uprights: [], beams: [], loads: [] }
+  const bays = Math.floor((maxZ - minZ) / BAY)
+  const z0 = minZ + ((maxZ - minZ) - bays * BAY) / 2
+  for (const x of ROW_XS) {
+    for (let b = 0; b <= bays; b++) {
+      const z = z0 + b * BAY
+      parts.uprights.push([x - DEPTH / 2, HEIGHT / 2, z], [x + DEPTH / 2, HEIGHT / 2, z])
+    }
+    for (const y of LEVELS) {
+      for (const side of [-1, 1]) parts.beams.push({ x: x + side * (DEPTH / 2), y: y + 0.05, z: z0 + (bays * BAY) / 2, length: bays * BAY })
+      for (let b = 0; b < bays; b++) {
+        // 일부 칸은 비워 실제 재고처럼 보이게
+        if (rng() < 0.22) continue
+        parts.loads.push([x, y + 0.1, z0 + b * BAY + BAY / 2])
+      }
+    }
+  }
+  return parts
+}
+
+/** 자재창고 랙(정적, 인스턴싱) */
+export function Warehouse() {
+  const parts = useMemo(buildRacks, [])
+  const geometries = useMemo(
+    () => ({
+      upright: new BoxGeometry(0.1, HEIGHT, 0.1),
+      pallet: new BoxGeometry(1.1, 0.14, 1.1),
+      load: new BoxGeometry(1.0, 1.0, 1.0),
+    }),
+    [],
+  )
+  const uprights = useRef<InstancedMesh>(null)
+  const pallets = useRef<InstancedMesh>(null)
+  const loads = useRef<InstancedMesh>(null)
+
+  useLayoutEffect(() => {
+    const dummy = new Object3D()
+    parts.uprights.forEach(([x, y, z], i) => {
+      dummy.position.set(x, y, z)
+      dummy.updateMatrix()
+      uprights.current!.setMatrixAt(i, dummy.matrix)
+    })
+    parts.loads.forEach(([x, y, z], i) => {
+      dummy.position.set(x, y + 0.07, z)
+      dummy.updateMatrix()
+      pallets.current!.setMatrixAt(i, dummy.matrix)
+      dummy.position.set(x, y + 0.14 + 0.5, z)
+      dummy.updateMatrix()
+      loads.current!.setMatrixAt(i, dummy.matrix)
+    })
+    for (const mesh of [uprights.current!, pallets.current!, loads.current!]) mesh.instanceMatrix.needsUpdate = true
+  }, [parts])
+
+  const { pickup } = simulation.layout.warehouse
+  return (
+    <group>
+      <instancedMesh ref={uprights} args={[geometries.upright, undefined, parts.uprights.length]} castShadow>
+        <meshStandardMaterial color={COLORS.primary} />
+      </instancedMesh>
+      {parts.beams.map((b, i) => (
+        <mesh key={i} position={[b.x, b.y, b.z]} castShadow>
+          <boxGeometry args={[0.08, 0.12, b.length]} />
+          <meshStandardMaterial color="#f08c1a" />
+        </mesh>
+      ))}
+      <instancedMesh ref={pallets} args={[geometries.pallet, undefined, parts.loads.length]} castShadow>
+        <meshStandardMaterial color={COLORS.pallet} />
+      </instancedMesh>
+      <instancedMesh ref={loads} args={[geometries.load, undefined, parts.loads.length]} castShadow receiveShadow>
+        <meshStandardMaterial color={COLORS.rawPart} />
+      </instancedMesh>
+      {/* 출고장 바닥 표시 */}
+      <mesh position={[pickup.x, 0.02, pickup.z]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[1.8, 1.8]} />
+        <meshStandardMaterial color={COLORS.primary} transparent opacity={0.18} />
+      </mesh>
+    </group>
+  )
+}
