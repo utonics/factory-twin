@@ -114,3 +114,48 @@ describe('데이터 파이프라인', () => {
     expect(precededBySensorAlarm / faults).toBeGreaterThan(0.3)
   })
 })
+
+describe('출하 오더·도크·재고', () => {
+  it('완료 오더의 출하 팔레트 합이 오더 수량과 같고, 납기 준수율이 계산된다', () => {
+    const { simulation, plant, processor } = createPipeline(2)
+    let shippedToOrders = 0
+    simulation.subscribe((e) => {
+      if (e.type === 'orderShipped') shippedToOrders += e.pallets
+    })
+    plant.step(7200)
+    const { orders } = processor.snapshot(null)
+    expect(orders.completed).toBeGreaterThan(10)
+    expect(orders.onTimeRate).not.toBeNull()
+    expect(orders.onTimeRate!).toBeGreaterThan(0)
+    expect(orders.onTimeRate!).toBeLessThanOrEqual(1)
+    // 오더에 배정된 팔레트는 실제 출하량을 넘을 수 없다
+    expect(shippedToOrders).toBeLessThanOrEqual(simulation.state.shipping.shippedPallets)
+    for (const o of orders.list) expect(o.shipped).toBeLessThanOrEqual(o.pallets)
+  })
+
+  it('도크 사용·운행 트럭 수가 트럭 상태와 일치한다', () => {
+    const { simulation, plant, processor } = createPipeline(3)
+    for (let i = 0; i < 60; i++) {
+      plant.step(30)
+      const { logistics } = processor.snapshot(null)
+      const trucks = simulation.state.shipping.trucks
+      expect(logistics.docksInUse).toBe(trucks.filter((t) => t.status === 'docked').length)
+      expect(logistics.activeTrucks).toBe(trucks.filter((t) => t.status !== 'away').length)
+    }
+  })
+
+  it('창고 재고는 0~용량 범위를 지키고, 부족하면 긴급 발주로 회복된다', () => {
+    const { simulation, plant } = createPipeline(4)
+    let expedited = false
+    simulation.subscribe((e) => {
+      if (e.type === 'materialReceived' && e.expedited) expedited = true
+    })
+    for (let i = 0; i < 720; i++) {
+      plant.step(10)
+      const { stock } = simulation.state.warehouse
+      expect(stock).toBeGreaterThanOrEqual(0)
+      expect(stock).toBeLessThanOrEqual(factoryLayout.warehouse.capacity)
+    }
+    expect(expedited).toBe(true)
+  })
+})

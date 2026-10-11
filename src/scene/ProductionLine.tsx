@@ -2,6 +2,10 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useMemo } from 'react'
 import { CanvasTexture, RepeatWrapping, SRGBColorSpace } from 'three'
 import type { LineSpec, StationSpec } from '../domain/types'
+import { simulation } from '../runtime'
+import { matchesStationFilter } from '../store/filters'
+import { useFactoryStore } from '../store/useFactoryStore'
+import { Dimmable } from './Dimmable'
 import { BELT_Y, COLORS, sceneDelta } from './theme'
 import { Selectable } from './Selectable'
 import { CncMachine } from './stations/CncMachine'
@@ -91,14 +95,22 @@ function Conveyor({ line }: { line: LineSpec }) {
   )
 }
 
+/** 설비 목록 탭에서 상태 필터를 걸었을 때만 나머지 설비를 흐리게 */
+function isStationDimmed(stationId: string): boolean {
+  const { listTab, stationFilter } = useFactoryStore.getState()
+  return listTab === 'stations' && !matchesStationFilter(simulation.state.stations[stationId].status, stationFilter)
+}
+
 export function ProductionLine({ line }: { line: LineSpec }) {
   return (
     <group position={[0, 0, line.z]}>
       <Conveyor line={line} />
       {line.stations.map((spec) => (
         <Selectable key={spec.id} id={spec.id} position={[spec.x, 0, 0]}>
-          <StationModel spec={spec} />
-          <StackLight stationId={spec.id} position={[1.3, 0, -1.15]} />
+          <Dimmable isDimmed={() => isStationDimmed(spec.id)}>
+            <StationModel spec={spec} />
+            <StackLight stationId={spec.id} position={[1.3, 0, -1.15]} />
+          </Dimmable>
         </Selectable>
       ))}
       {/* 투입·배출 영역(클릭 시 라인 정보) */}

@@ -1,12 +1,14 @@
 import { MapControls } from '@react-three/drei'
 import { useFrame, useThree } from '@react-three/fiber'
 import { useEffect, useRef, type ComponentRef } from 'react'
-import { Vector3 } from 'three'
+import type { Vector3 } from 'three'
 import { simulation } from '../runtime'
 import { useFactoryStore } from '../store/useFactoryStore'
+import { areaCamera, AREAS } from './areas'
 
-export const HOME_POSITION = new Vector3(24, 80, 92)
-export const HOME_TARGET = new Vector3(10, 0, 8)
+const HOME = areaCamera(AREAS[0])
+export const HOME_POSITION = HOME.position
+const HOME_TARGET = HOME.target
 const MIN_DISTANCE = 12
 const MAX_DISTANCE = 140
 const MARGIN = 6
@@ -26,8 +28,10 @@ export function CameraRig() {
   useEffect(() => {
     const c = controls.current
     if (!command || !c) return
-    if (command.type === 'home') {
-      flight.current = { position: HOME_POSITION.clone(), target: HOME_TARGET.clone() }
+    if (command.type === 'focus') {
+      // 구역 선택: 해당 구역 시점으로 부드럽게 이동
+      const area = AREAS.find((a) => a.id === command.areaId) ?? AREAS[0]
+      flight.current = areaCamera(area)
       return
     }
     const offset = camera.position.clone().sub(c.target)

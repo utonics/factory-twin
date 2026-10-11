@@ -6,12 +6,13 @@ import { SensorChart } from './charts/SensorChart'
 import { CHART } from './charts/chartTheme'
 import { formatDuration } from './labels'
 
-function SensorSeries({ assetId }: { assetId: string }) {
+/** 자산의 센서·계측 시계열(최근 10분). AGV·창고 패널에서도 쓴다. */
+export function SensorSeriesSection({ assetId, title = '센서 추이' }: { assetId: string; title?: string }) {
   const { selectedSeries, time } = useFactoryStore((s) => s.analytics)
   if (!selectedSeries || selectedSeries.assetId !== assetId) return null
   return (
     <section className="panel-section">
-      <h4>센서 추이 · 최근 10분</h4>
+      <h4>{title} · 최근 10분</h4>
       {selectedSeries.series.map((s) => (
         <SensorChart key={s.spec.tag} spec={s.spec} points={s.points} now={time} />
       ))}
@@ -34,13 +35,9 @@ export function StationAnalyticsSection({ stationId }: { stationId: string }) {
         <h4>예지 보전 · {healthTag?.label} 기준</h4>
         <HealthBlock health={analytics.health} etaSeconds={analytics.etaSeconds} tagLabel={healthTag?.label ?? ''} />
       </section>
-      <SensorSeries assetId={stationId} />
+      <SensorSeriesSection assetId={stationId} />
     </>
   )
-}
-
-export function AgvAnalyticsSection({ agvId }: { agvId: string }) {
-  return <SensorSeries assetId={agvId} />
 }
 
 export function LineAnalyticsSection({ lineId }: { lineId: string }) {

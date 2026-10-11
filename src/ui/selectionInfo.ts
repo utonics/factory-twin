@@ -68,19 +68,37 @@ export function selectionInfo(snapshot: FactorySnapshot, id: string): SelectionI
     }
   }
 
-  if (id === 'TRUCK') {
-    const t = snapshot.truck
+  const dock = snapshot.docks.find((d) => d.dockId === id)
+  if (dock) {
+    const { shipping } = snapshot
     return {
-      kindLabel: '출하 트럭',
-      title: t.status === 'away' ? '다음 트럭 대기' : t.id,
-      subtitle: t.status === 'away' ? '배차 대기 중' : t.plate,
-      statusLabel: TRUCK_STATUS_LABEL[t.status],
-      statusColor: TRUCK_COLOR[t.status],
-      meter: { label: `상차 ${t.load}/${t.capacity} 팔레트`, value: t.load / t.capacity, color: '#2f5bea' },
+      kindLabel: `출하 도크 · ${dock.dockName}`,
+      title: dock.status === 'away' ? '다음 트럭 대기' : dock.truckId,
+      subtitle: dock.status === 'away' ? '도크 비어 있음' : dock.plate,
+      statusLabel: TRUCK_STATUS_LABEL[dock.status],
+      statusColor: TRUCK_COLOR[dock.status],
+      meter: { label: `상차 ${dock.load}/${dock.capacity} 팔레트`, value: dock.load / dock.capacity, color: '#2f5bea' },
       rows: [
-        ['적치장 대기', `${t.staged}/${t.stagingCapacity} 팔레트`],
-        ['누적 출하', `${t.shippedPallets} 팔레트`],
-        ['출발 트럭', `${t.trucksDispatched}대`],
+        ['적치장 대기', `${shipping.staged}/${shipping.stagingCapacity} 팔레트`],
+        ['누적 출하(전체 도크)', `${shipping.shippedPallets} 팔레트`],
+        ['출발 트럭(전체 도크)', `${shipping.trucksDispatched}대`],
+      ],
+    }
+  }
+
+  if (id === 'WH') {
+    const wh = snapshot.warehouse
+    const low = wh.stock < 30
+    return {
+      kindLabel: '자재창고',
+      title: '원자재 창고',
+      subtitle: `랙 ${wh.capacity}팔레트 보관`,
+      statusLabel: wh.expedited ? '긴급 발주 중' : low ? '재고 부족' : '정상',
+      statusColor: wh.expedited || low ? '#e08a00' : '#22b573',
+      meter: { label: `재고 ${wh.stock}/${wh.capacity} 팔레트`, value: wh.stock / wh.capacity, color: low ? '#e08a00' : '#2f5bea' },
+      rows: [
+        ['다음 입고까지', formatDuration(wh.nextInboundIn)],
+        ['입고 구분', wh.expedited ? '긴급 입고' : '정기 입고'],
       ],
     }
   }

@@ -57,25 +57,35 @@ export interface LineSnapshot {
   rejected: number
 }
 
-export interface TruckSnapshot {
-  id: string
+export interface DockSnapshot {
+  dockId: string
+  dockName: string
+  truckId: string
   plate: string
   status: TruckStatus
   load: number
   capacity: number
+}
+
+export interface ShippingSnapshot {
   staged: number
   stagingCapacity: number
   shippedPallets: number
   trucksDispatched: number
 }
 
+export interface WarehouseSnapshot {
+  stock: number
+  capacity: number
+  /** 다음 입고까지 남은 시간(초) */
+  nextInboundIn: number
+  expedited: boolean
+}
+
 export interface FactoryKpis {
   produced: number
   throughputPerHour: number
-  runningStations: number
-  downStations: number
   totalStations: number
-  activeAgvs: number
   totalAgvs: number
   shippedPallets: number
   wip: number
@@ -87,7 +97,9 @@ export interface FactorySnapshot {
   stations: StationSnapshot[]
   agvs: AgvSnapshot[]
   lines: LineSnapshot[]
-  truck: TruckSnapshot
+  docks: DockSnapshot[]
+  shipping: ShippingSnapshot
+  warehouse: WarehouseSnapshot
   kpis: FactoryKpis
   events: FactoryEvent[]
 }
@@ -174,24 +186,31 @@ export function createSnapshot(sim: FactorySimulation): FactorySnapshot {
     stations,
     agvs,
     lines,
-    truck: {
-      id: shipping.truck.id,
-      plate: shipping.truck.plate,
-      status: shipping.truck.status,
-      load: shipping.truck.load,
+    docks: shipping.trucks.map((t) => ({
+      dockId: t.dockId,
+      dockName: layout.shipping.docks.find((d) => d.id === t.dockId)?.name ?? t.dockId,
+      truckId: t.id,
+      plate: t.plate,
+      status: t.status,
+      load: t.load,
       capacity: layout.shipping.truckCapacity,
+    })),
+    shipping: {
       staged: shipping.staged,
       stagingCapacity: layout.shipping.stagingCapacity,
       shippedPallets: shipping.shippedPallets,
       trucksDispatched: shipping.trucksDispatched,
     },
+    warehouse: {
+      stock: state.warehouse.stock,
+      capacity: layout.warehouse.capacity,
+      nextInboundIn: Math.max(0, state.warehouse.nextInboundAt - time),
+      expedited: state.warehouse.expedited,
+    },
     kpis: {
       produced,
       throughputPerHour: time > 0 ? (produced / time) * 3600 : 0,
-      runningStations: stations.filter((s) => s.status === 'processing').length,
-      downStations: stations.filter((s) => s.status === 'down').length,
       totalStations: stations.length,
-      activeAgvs: agvs.filter((a) => a.status !== 'charging' && (a.cargo !== null || a.cargoLineId !== null)).length,
       totalAgvs: agvs.length,
       shippedPallets: shipping.shippedPallets,
       wip,

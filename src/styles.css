@@ -181,8 +181,18 @@ button {
   display: flex;
   gap: 12px;
   align-items: flex-start;
-  min-width: 196px;
-  padding: 14px 18px 14px 16px;
+  min-width: 176px;
+  padding: 14px 16px 14px 14px;
+  border: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.kpi.is-clickable {
+  cursor: pointer;
+}
+.kpi.is-clickable:hover {
+  box-shadow: 0 0 0 2px var(--primary-soft), var(--shadow);
 }
 .kpi-icon {
   display: grid;
@@ -435,33 +445,54 @@ button {
   stroke: #22b573;
   stroke-width: 2.5;
 }
-.truck-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 210px;
+.dock-summary {
+  min-width: 230px;
   padding: 12px 14px;
-  border: 0;
   border-radius: 12px;
   background: #f4f6fa;
-  text-align: left;
 }
-.truck-card b,
-.truck-card small {
+.dock-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.dock-summary-head b,
+.dock-summary-head small {
   display: block;
 }
-.truck-card b {
+.dock-summary-head b {
   font-size: 14px;
 }
-.truck-card small {
+.dock-summary-head small {
   font-size: 12px;
-  margin-top: 2px;
+}
+.dock-row {
+  display: grid;
+  grid-template-columns: 52px 64px 1fr;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 4px;
+  border: 0;
+  border-top: 1px solid #e3e8f0;
+  background: transparent;
+  font-size: 12px;
+  text-align: left;
+}
+.dock-row:hover {
+  background: #eaf0ff;
+}
+.dock-row small {
+  color: var(--muted);
+  white-space: nowrap;
 }
 .truck-icon {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
+  flex: none;
+  width: 36px;
+  height: 36px;
   border-radius: 12px;
   background: var(--primary);
   color: #fff;
@@ -613,7 +644,11 @@ button {
 
 @media (max-width: 1500px) {
   .kpi {
-    min-width: 170px;
+    min-width: 150px;
+    padding: 12px;
+  }
+  .kpi-icon {
+    display: none;
   }
   .right-column {
     width: 360px;
@@ -828,4 +863,69 @@ button {
   display: block;
   height: 100%;
   border-radius: 99px;
+}
+
+/* ---------- 구역 선택·필터·오더 ---------- */
+.area-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 6px;
+  padding-left: 12px;
+  border-left: 1px solid var(--line);
+  font-size: 12px;
+  color: var(--muted);
+}
+.area-select select {
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center;
+  appearance: none;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  cursor: pointer;
+}
+.area-select select:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 8px 0 6px;
+}
+.filter-row button {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+.filter-row button span {
+  margin-left: 2px;
+  font-variant-numeric: tabular-nums;
+  color: #9aa4b2;
+}
+.filter-row button.active {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+  color: var(--primary);
+}
+.filter-row button.active span {
+  color: var(--primary);
+}
+.tabs button {
+  padding: 6px 9px;
+}
+.row.order {
+  cursor: default;
+}
+.row.order:hover {
+  background: transparent;
 }

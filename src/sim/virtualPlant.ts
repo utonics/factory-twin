@@ -19,6 +19,7 @@ export class VirtualPlant {
   private readonly rng: () => number
   private readonly temps = new Map<string, number>()
   private nextSampleAt = 0
+  private started = false
 
   constructor(
     readonly simulation: FactorySimulation,
@@ -31,6 +32,10 @@ export class VirtualPlant {
   }
 
   step(dt: number): void {
+    if (!this.started) {
+      this.started = true
+      this.publishInitialState()
+    }
     let remaining = dt
     while (remaining > 1e-6) {
       const h = Math.min(remaining, SUBSTEP)
@@ -49,14 +54,51 @@ export class VirtualPlant {
     return (this.rng() + this.rng() + this.rng() - 1.5) * 1.15
   }
 
-  private topicOf(lineId: string, assetId: string, kind: 'telemetry' | 'event'): string {
-    return `f01/${lineId}/${assetId}/${kind}`
+  private topicOf(area: string, assetId: string, kind: 'telemetry' | 'event'): string {
+    return `f01/${area}/${assetId}/${kind}`
+  }
+
+  /** 이벤트 출처별 토픽: 설비·라인은 라인 아래, 물류는 logistics, 주문은 erp */
+  private eventTopic(event: PlantEvent): string {
+    switch (event.type) {
+      case 'stationState':
+      case 'cycleComplete':
+        return this.topicOf(event.lineId, event.stationId, 'event')
+      case 'unitCompleted':
+        return this.topicOf(event.lineId, event.lineId, 'event')
+      case 'truckState':
+        return this.topicOf('logistics', event.dockId, 'event')
+      case 'materialReceived':
+        return this.topicOf('logistics', 'WH', 'event')
+      case 'orderCreated':
+      case 'orderShipped':
+        return this.topicOf('erp', event.orderId, 'event')
+    }
   }
 
   private publishEvent(event: PlantEvent): void {
-    const lineId = 'lineId' in event ? event.lineId : 'logistics'
-    const assetId = 'stationId' in event ? event.stationId : 'truckId' in event ? event.truckId : lineId
-    this.bus.publish({ kind: 'event', topic: this.topicOf(lineId, assetId, 'event'), ts: event.ts, event })
+    this.bus.publish({ kind: 'event', topic: this.eventTopic(event), ts: event.ts, event })
+  }
+
+  /**
+   * 이벤트는 변경분만 전하므로, 첫 진행 시 현재 상태 전체를 한 번 발행한다
+   * (실설비 연동에서 접속 직후 받는 초기 상태와 같은 역할).
+   */
+  private publishInitialState(): void {
+    const { state, layout } = this.simulation
+    const ts = state.time
+    for (const line of layout.lines) {
+      for (const spec of line.stations) {
+        const status = state.stations[spec.id].status
+        this.publishEvent({ type: 'stationState', ts, stationId: spec.id, lineId: line.id, state: status, prev: status })
+      }
+    }
+    for (const truck of state.shipping.trucks) {
+      this.publishEvent({ type: 'truckState', ts, truckId: truck.id, dockId: truck.dockId, state: truck.status, load: truck.load })
+    }
+    for (const order of state.orders) {
+      this.publishEvent({ type: 'orderCreated', ts, orderId: order.id, customer: order.customer, pallets: order.pallets, dueAt: order.dueAt })
+    }
   }
 
   /** 온도처럼 시간에 따라 누적되는 물리량 적분 */
@@ -139,6 +181,18 @@ export class VirtualPlant {
           values: this.stationValues(spec, st),
         })
       }
+    }
+    // 재고 계측: 창고 원자재 재고, 라인 투입 버퍼
+    this.bus.publish({ kind: 'telemetry', topic: this.topicOf('logistics', 'WH', 'telemetry'), ts, assetId: 'WH', running: true, values: { stock: state.warehouse.stock } })
+    for (const line of layout.lines) {
+      this.bus.publish({
+        kind: 'telemetry',
+        topic: this.topicOf(line.id, line.id, 'telemetry'),
+        ts,
+        assetId: line.id,
+        running: true,
+        values: { inputUnits: state.lines[line.id].inputUnits },
+      })
     }
     for (const agv of state.agvs) {
       this.bus.publish({

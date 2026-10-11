@@ -1,4 +1,5 @@
 import { simulation } from '../runtime'
+import { AREAS, type AreaId } from '../scene/areas'
 import { useFactoryStore } from '../store/useFactoryStore'
 import { BellIcon, CubeIcon, PauseIcon, PlayIcon } from './icons'
 import { formatClock } from './labels'
@@ -14,6 +15,8 @@ export function TopBar() {
   const togglePause = useFactoryStore((s) => s.togglePause)
   const { activeAlarmCount, messagesPerMinute } = useFactoryStore((s) => s.analytics)
   const setListTab = useFactoryStore((s) => s.setListTab)
+  const area = useFactoryStore((s) => s.area)
+  const setArea = useFactoryStore((s) => s.setArea)
   const activeAlarms = activeAlarmCount.warn + activeAlarmCount.crit
 
   return (
@@ -32,6 +35,16 @@ export function TopBar() {
             {simulation.layout.lines.length}개 라인 · 설비 {kpis.totalStations}대 · AGV {kpis.totalAgvs}대
           </small>
         </div>
+        <label className="area-select">
+          <span>구역</span>
+          <select value={area} onChange={(e) => setArea(e.target.value as AreaId)} aria-label="구역 선택(카메라 이동)">
+            {AREAS.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.label}
+              </option>
+            ))}
+          </select>
+        </label>
       </div>
       <div className="topbar-spacer" />
       <div className="data-pill" title="가상 센서·설비 이벤트 메시지 수신량(시뮬레이션 시간 기준)">

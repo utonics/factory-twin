@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import type { Group, MeshStandardMaterial } from 'three'
+import type { DockSpec } from '../domain/types'
 import { simulation } from '../runtime'
 import { TRUCK_LENGTH } from '../sim/geometry'
 import { Selectable } from './Selectable'
@@ -53,13 +54,14 @@ function TruckModel() {
   )
 }
 
-export function ShippingDock() {
+/** 도크 게이트 1개와 그 도크를 오가는 트럭. 선택 id는 도크 id */
+function Dock({ dock, index }: { dock: DockSpec; index: number }) {
   const truck = useRef<Group>(null)
   const doorLight = useRef<MeshStandardMaterial>(null)
-  const { dockX, dockZ, stagingOrigin } = simulation.layout.shipping
+  const { dockX } = simulation.layout.shipping
 
   useFrame(() => {
-    const t = simulation.state.shipping.truck
+    const t = simulation.state.shipping.trucks[index]
     if (truck.current) {
       truck.current.visible = t.status !== 'away'
       truck.current.position.x = t.x
@@ -72,14 +74,8 @@ export function ShippingDock() {
   })
 
   return (
-    <group>
-      {/* 적치장 바닥 */}
-      <mesh position={[stagingOrigin.x + 3, 0.015, stagingOrigin.z + 0.75]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <planeGeometry args={[8, 3.6]} />
-        <meshStandardMaterial color={COLORS.primary} transparent opacity={0.1} />
-      </mesh>
-      {/* 도크 게이트 */}
-      <group position={[dockX, 0, dockZ]}>
+    <Selectable id={dock.id}>
+      <group position={[dockX, 0, dock.z]}>
         {[-1.7, 1.7].map((z) => (
           <mesh key={z} position={[0, 2.1, z]} castShadow>
             <boxGeometry args={[0.35, 4.2, 0.35]} />
@@ -103,12 +99,25 @@ export function ShippingDock() {
           <meshStandardMaterial ref={doorLight} color={COLORS.ng} emissive={COLORS.ng} emissiveIntensity={1.5} toneMapped={false} />
         </mesh>
       </group>
-      {/* 트럭 */}
-      <group ref={truck} position={[0, 0, dockZ]}>
-        <Selectable id="TRUCK">
-          <TruckModel />
-        </Selectable>
+      <group ref={truck} position={[0, 0, dock.z]}>
+        <TruckModel />
       </group>
+    </Selectable>
+  )
+}
+
+export function ShippingDock() {
+  const { stagingOrigin, docks } = simulation.layout.shipping
+  return (
+    <group>
+      {/* 적치장 바닥 */}
+      <mesh position={[stagingOrigin.x + 3, 0.015, stagingOrigin.z + 0.75]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[8, 3.6]} />
+        <meshStandardMaterial color={COLORS.primary} transparent opacity={0.1} />
+      </mesh>
+      {docks.map((dock, i) => (
+        <Dock key={dock.id} dock={dock} index={i} />
+      ))}
     </group>
   )
 }

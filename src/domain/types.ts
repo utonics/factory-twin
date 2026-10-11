@@ -73,6 +73,13 @@ export interface AgvSpec {
   startAt: number
 }
 
+export interface DockSpec {
+  id: string
+  name: string
+  /** 도크 중심 z 좌표 */
+  z: number
+}
+
 export interface FactoryLayout {
   name: string
   floor: { minX: number; maxX: number; minZ: number; maxZ: number }
@@ -87,13 +94,22 @@ export interface FactoryLayout {
     stops: AgvStopSpec[]
     fleet: AgvSpec[]
   }
-  warehouse: { minX: number; maxX: number; minZ: number; maxZ: number; pickup: Vec2 }
+  warehouse: {
+    minX: number
+    maxX: number
+    minZ: number
+    maxZ: number
+    pickup: Vec2
+    /** 랙 보관 가능 팔레트 수 */
+    capacity: number
+    initialStock: number
+  }
   shipping: {
     stagingOrigin: Vec2
     stagingCapacity: number
     truckCapacity: number
     dockX: number
-    dockZ: number
+    docks: DockSpec[]
   }
 }
 
@@ -175,6 +191,7 @@ export interface AgvState {
 
 export interface TruckState {
   id: string
+  dockId: string
   plate: string
   status: TruckStatus
   /** 트럭 중심 x 좌표 */
@@ -187,7 +204,26 @@ export interface ShippingState {
   staged: number
   shippedPallets: number
   trucksDispatched: number
-  truck: TruckState
+  /** 도크마다 트럭 1대가 접안·출발을 반복 */
+  trucks: TruckState[]
+}
+
+export interface WarehouseState {
+  /** 원자재 재고(팔레트) */
+  stock: number
+  nextInboundAt: number
+  /** 긴급 발주가 걸려 있는지 */
+  expedited: boolean
+}
+
+/** 고객 출하 오더(미완료만 보관) */
+export interface OrderState {
+  id: string
+  customer: string
+  pallets: number
+  shipped: number
+  createdAt: number
+  dueAt: number
 }
 
 export interface FactoryEvent {
@@ -206,6 +242,8 @@ export interface FactoryState {
   lines: Record<string, LineState>
   agvs: AgvState[]
   shipping: ShippingState
+  warehouse: WarehouseState
+  orders: OrderState[]
   events: FactoryEvent[]
 }
 
@@ -228,4 +266,7 @@ export type PlantEvent =
       defect: DefectType | null
     }
   | { type: 'unitCompleted'; ts: number; lineId: string; itemId: number; leadTime: number }
-  | { type: 'truckDeparted'; ts: number; truckId: string; pallets: number }
+  | { type: 'truckState'; ts: number; truckId: string; dockId: string; state: TruckStatus; load: number }
+  | { type: 'orderCreated'; ts: number; orderId: string; customer: string; pallets: number; dueAt: number }
+  | { type: 'orderShipped'; ts: number; orderId: string; truckId: string; pallets: number; completed: boolean }
+  | { type: 'materialReceived'; ts: number; pallets: number; expedited: boolean }

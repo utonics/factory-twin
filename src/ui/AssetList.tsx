@@ -1,4 +1,6 @@
 import type { AlarmRecord } from '../platform/alarms'
+import type { OrderView } from '../platform/processor'
+import { AGV_FILTERS, matchesAgvFilter, matchesStationFilter, STATION_FILTERS } from '../store/filters'
 import { AGV_STATUS_COLOR, STATION_STATUS_COLOR } from '../scene/theme'
 import { useFactoryStore } from '../store/useFactoryStore'
 import { STATUS } from './charts/chartTheme'
@@ -18,6 +20,45 @@ function Bar({ value, color }: { value: number; color: string }) {
   return (
     <div className="mini-bar">
       <div style={{ width: `${Math.round(value * 100)}%`, background: color }} />
+    </div>
+  )
+}
+
+function FilterChips<T extends string>({ options, value, onChange, counts }: { options: [T, string][]; value: T; onChange: (v: T) => void; counts: Record<string, number> }) {
+  return (
+    <div className="filter-row" role="group" aria-label="상태 필터">
+      {options.map(([id, label]) => (
+        <button key={id} type="button" className={value === id ? 'active' : ''} onClick={() => onChange(id)} aria-pressed={value === id}>
+          {label} <span>{counts[id] ?? 0}</span>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function OrderRow({ order, now }: { order: OrderView; now: number }) {
+  const done = order.completedAt !== null
+  const status = done ? (order.late ? '지연 출하' : '출하 완료') : order.late ? '납기 지연' : order.shipped > 0 ? '부분 출하' : '출하 대기'
+  const color = order.late ? STATUS.crit : done ? STATUS.good : '#2f5bea'
+  const slack = order.dueAt - now
+  return (
+    <div className={`row order ${done ? 'is-cleared' : ''}`}>
+      <span className="row-id">
+        <b>
+          {order.id} · {order.customer}
+        </b>
+        <small>
+          납기 {formatClock(order.dueAt).slice(0, 5)}
+          {done ? ` · 완료 ${formatClock(order.completedAt!).slice(0, 5)}` : slack >= 0 ? ` · ${Math.ceil(slack / 60)}분 남음` : ` · ${Math.ceil(-slack / 60)}분 초과`}
+        </small>
+      </span>
+      <StatusChip label={status} color={color} />
+      <span className="row-meter">
+        <Bar value={order.shipped / order.pallets} color="#2f5bea" />
+        <small>
+          {order.shipped}/{order.pallets}
+        </small>
+      </span>
     </div>
   )
 }
@@ -71,12 +112,25 @@ export function AssetList() {
   const tab = useFactoryStore((s) => s.listTab)
   const setTab = useFactoryStore((s) => s.setListTab)
   const { stations, agvs, events } = useFactoryStore((s) => s.snapshot)
-  const { alarms, activeAlarmCount } = useFactoryStore((s) => s.analytics)
+  const { alarms, activeAlarmCount, orders, time } = useFactoryStore((s) => s.analytics)
   const selectedId = useFactoryStore((s) => s.selectedId)
   const select = useFactoryStore((s) => s.select)
+  const stationFilter = useFactoryStore((s) => s.stationFilter)
+  const setStationFilter = useFactoryStore((s) => s.setStationFilter)
+  const agvFilter = useFactoryStore((s) => s.agvFilter)
+  const setAgvFilter = useFactoryStore((s) => s.setAgvFilter)
+  const delayedOnly = useFactoryStore((s) => s.delayedOnly)
+  const setDelayedOnly = useFactoryStore((s) => s.setDelayedOnly)
   const activeAlarms = activeAlarmCount.warn + activeAlarmCount.crit
   const running = stations.filter((s) => s.status === 'processing').length
   const busyAgvs = agvs.filter((a) => a.status !== 'charging').length
+
+  const stationCounts = Object.fromEntries(STATION_FILTERS.map(([id]) => [id, stations.filter((s) => matchesStationFilter(s.status, id)).length]))
+  const agvCounts = Object.fromEntries(AGV_FILTERS.map(([id]) => [id, agvs.filter((a) => matchesAgvFilter(a.status, id)).length]))
+  const visibleStations = stations.filter((s) => matchesStationFilter(s.status, stationFilter))
+  const visibleAgvs = agvs.filter((a) => matchesAgvFilter(a.status, agvFilter))
+  const lateOrders = orders.list.filter((o) => o.late)
+  const visibleOrders = delayedOnly ? lateOrders : orders.list
 
   return (
     <section className="asset-list card">
@@ -87,6 +141,9 @@ export function AssetList() {
         <button type="button" className={tab === 'agvs' ? 'active' : ''} onClick={() => setTab('agvs')}>
           AGV <b>{busyAgvs}/{agvs.length}</b>
         </button>
+        <button type="button" className={tab === 'orders' ? 'active' : ''} onClick={() => setTab('orders')}>
+          오더 <b className={orders.overdueOpen > 0 ? 'is-crit' : ''}>{orders.open}</b>
+        </button>
         <button type="button" className={tab === 'alarms' ? 'active' : ''} onClick={() => setTab('alarms')}>
           알람 <b className={activeAlarmCount.crit > 0 ? 'is-crit' : ''}>{activeAlarms}</b>
         </button>
@@ -94,9 +151,23 @@ export function AssetList() {
           이벤트
         </button>
       </div>
+      {tab === 'stations' && <FilterChips options={STATION_FILTERS} value={stationFilter} onChange={setStationFilter} counts={stationCounts} />}
+      {tab === 'agvs' && <FilterChips options={AGV_FILTERS} value={agvFilter} onChange={setAgvFilter} counts={agvCounts} />}
+      {tab === 'orders' && (
+        <FilterChips
+          options={[
+            ['all', '전체'],
+            ['late', '지연만'],
+          ]}
+          value={delayedOnly ? 'late' : 'all'}
+          onChange={(v) => setDelayedOnly(v === 'late')}
+          counts={{ all: orders.list.length, late: lateOrders.length }}
+        />
+      )}
       <div className="rows">
+        {tab === 'stations' && visibleStations.length === 0 && <p className="muted empty">해당 상태의 설비가 없습니다.</p>}
         {tab === 'stations' &&
-          stations.map((s) => (
+          visibleStations.map((s) => (
             <button type="button" key={s.id} className={`row ${selectedId === s.id ? 'selected' : ''}`} onClick={() => select(s.id)}>
               <span className="row-id">
                 <b>{s.name}</b>
@@ -109,8 +180,9 @@ export function AssetList() {
               </span>
             </button>
           ))}
+        {tab === 'agvs' && visibleAgvs.length === 0 && <p className="muted empty">해당 상태의 AGV가 없습니다.</p>}
         {tab === 'agvs' &&
-          agvs.map((a) => (
+          visibleAgvs.map((a) => (
             <button type="button" key={a.id} className={`row ${selectedId === a.id ? 'selected' : ''}`} onClick={() => select(a.id)}>
               <span className="row-id">
                 <b>{a.name}</b>
@@ -122,6 +194,12 @@ export function AssetList() {
                 <small>{a.battery.toFixed(0)}%</small>
               </span>
             </button>
+          ))}
+        {tab === 'orders' &&
+          (visibleOrders.length === 0 ? (
+            <p className="muted empty">{delayedOnly ? '납기 지연 오더가 없습니다.' : '오더가 없습니다.'}</p>
+          ) : (
+            visibleOrders.map((o) => <OrderRow key={o.id} order={o} now={time} />)
           ))}
         {tab === 'alarms' &&
           (alarms.length === 0 ? (

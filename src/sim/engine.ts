@@ -9,11 +9,14 @@ import {
   type ItemStage,
   type LineSpec,
   type LineState,
+  type OrderState,
   type PlantEvent,
   type StationKind,
   type StationSpec,
   type StationState,
   type StationStatus,
+  type TruckState,
+  type TruckStatus,
 } from '../domain/types'
 import { lineSegments, truckDockedX, TRUCK_OFFSCREEN_X } from './geometry'
 import { LoopPath } from './loopPath'
@@ -46,7 +49,23 @@ const STOP_ARRIVE = 0.02
 const DEFECT_WEIGHTS = [0.4, 0.3, 0.2, 0.1]
 
 const TRUCK_LOAD_INTERVAL = 3.5
-const TRUCK_AWAY_TIME = 30
+/** 출발 후 다음 트럭이 오기까지(초) */
+const TRUCK_AWAY_MIN = 60
+const TRUCK_AWAY_MAX = 180
+
+/** 고객 출하 오더: 평균 발생 간격(초), 팔레트 수, 납기 여유(초) */
+const ORDER_MEAN_INTERVAL = 210
+const ORDER_PALLETS = [2, 8]
+const ORDER_LEAD_TIME = [300, 1080]
+/** 시작 시점 오더의 추가 납기 여유(초) */
+const INITIAL_ORDER_EXTRA_LEAD = 600
+const CUSTOMERS = ['한빛모터스', '대성기계', '세진오토', '미래로보틱스', '동해산업', '나래전자']
+
+/** 원자재 정기 입고 간격(초)·수량(팔레트), 긴급 발주 기준과 리드타임 */
+const INBOUND_INTERVAL = [540, 1020]
+const INBOUND_PALLETS = [18, 30]
+const EXPEDITE_THRESHOLD = 32
+const EXPEDITE_LEAD_TIME = 180
 
 interface Segment {
   start: number
@@ -81,7 +100,9 @@ export class FactorySimulation {
   private readonly stationSpecs: Record<string, StationSpec> = {}
   private nextItemId = 1
   private nextEventId = 1
-  private truckSeq = 1
+  private truckSeq = 0
+  private orderSeq = 1000
+  private nextOrderAt = 0
   private readonly listeners = new Set<(event: PlantEvent) => void>()
 
   constructor(layout: FactoryLayout, options: SimulationOptions = {}) {
@@ -160,10 +181,28 @@ export class FactorySimulation {
         staged: 2,
         shippedPallets: 0,
         trucksDispatched: 0,
-        truck: { id: 'TRK-001', plate: this.nextPlate(), status: 'docked', x: truckDockedX(layout), load: 0, timer: TRUCK_LOAD_INTERVAL },
+        trucks: layout.shipping.docks.map((dock, i) => ({
+          id: this.nextTruckId(),
+          dockId: dock.id,
+          plate: this.nextPlate(),
+          // 첫 도크는 접안 상태로, 나머지는 시차를 두고 도착
+          status: i === 0 ? 'docked' : 'away',
+          x: i === 0 ? truckDockedX(layout) : TRUCK_OFFSCREEN_X,
+          load: 0,
+          timer: i === 0 ? TRUCK_LOAD_INTERVAL : 20 + i * 25,
+        })),
       },
+      warehouse: {
+        stock: layout.warehouse.initialStock,
+        nextInboundAt: this.uniform(INBOUND_INTERVAL),
+        expedited: false,
+      },
+      orders: [],
       events: [],
     }
+    // 시작 시점에 이미 접수된 오더 몇 건(라인이 채워지는 시간을 감안해 납기 여유를 더 줌)
+    for (let i = 0; i < 4; i++) this.createOrder(INITIAL_ORDER_EXTRA_LEAD)
+    this.nextOrderAt = this.exponential(ORDER_MEAN_INTERVAL)
 
     const warmup = options.warmup ?? 0
     if (warmup > 0) this.step(warmup)
@@ -199,6 +238,16 @@ export class FactorySimulation {
     for (const rt of this.runtimes) this.tickLine(rt, h)
     this.tickAgvs(h)
     this.tickShipping(h)
+    this.tickWarehouse()
+    this.tickOrders()
+  }
+
+  private uniform([min, max]: number[]): number {
+    return min + this.rng() * (max - min)
+  }
+
+  private exponential(mean: number): number {
+    return -Math.log(1 - this.rng()) * mean
   }
 
   private log(level: EventLevel, sourceId: string, message: string): void {
@@ -480,6 +529,7 @@ export class FactorySimulation {
     switch (stop.kind) {
       case 'warehouse': {
         if (agv.cargo !== null || agv.cargoLineId !== null) return false
+        if (this.state.warehouse.stock < 1) return false
         let pick: LineSpec | null = null
         let pickLevel = Infinity
         for (const spec of this.layout.lines) {
@@ -492,6 +542,8 @@ export class FactorySimulation {
         }
         if (!pick) return false
         this.state.lines[pick.id].inboundUnits += pick.palletSize
+        // 출고 예약과 동시에 재고 차감
+        this.state.warehouse.stock--
         agv.cargoLineId = pick.id
         return true
       }
@@ -588,31 +640,44 @@ export class FactorySimulation {
     return `경기 ${80 + Math.floor(this.rng() * 19)}사 ${n}`
   }
 
+  private nextTruckId(): string {
+    this.truckSeq++
+    return `TRK-${String(this.truckSeq).padStart(3, '0')}`
+  }
+
+  private setTruckStatus(truck: TruckState, status: TruckStatus): void {
+    truck.status = status
+    this.emit({ type: 'truckState', ts: this.state.time, truckId: truck.id, dockId: truck.dockId, state: status, load: truck.load })
+  }
+
   private tickShipping(h: number): void {
+    for (const truck of this.state.shipping.trucks) this.tickTruck(truck, h)
+  }
+
+  private tickTruck(truck: TruckState, h: number): void {
     const shipping = this.state.shipping
-    const truck = shipping.truck
     const dockedX = truckDockedX(this.layout)
     const capacity = this.layout.shipping.truckCapacity
+    const dockName = this.layout.shipping.docks.find((d) => d.id === truck.dockId)?.name ?? truck.dockId
 
     switch (truck.status) {
       case 'away':
         truck.timer -= h
         if (truck.timer <= 0) {
-          this.truckSeq++
-          truck.id = `TRK-${String(this.truckSeq).padStart(3, '0')}`
+          truck.id = this.nextTruckId()
           truck.plate = this.nextPlate()
-          truck.status = 'arriving'
           truck.x = TRUCK_OFFSCREEN_X
           truck.load = 0
+          this.setTruckStatus(truck, 'arriving')
         }
         break
       case 'arriving': {
         const speed = Math.min(9, Math.max(1.2, (truck.x - dockedX) * 0.9))
         truck.x = Math.max(dockedX, truck.x - speed * h)
         if (truck.x <= dockedX) {
-          truck.status = 'docked'
           truck.timer = TRUCK_LOAD_INTERVAL
-          this.log('info', truck.id, `출하 트럭 ${truck.id} 도크 접안`)
+          this.setTruckStatus(truck, 'docked')
+          this.log('info', truck.id, `출하 트럭 ${truck.id} ${dockName} 접안`)
         }
         break
       }
@@ -626,23 +691,83 @@ export class FactorySimulation {
           }
         }
         if (truck.load >= capacity) {
-          truck.status = 'departing'
           truck.timer = 0
           shipping.shippedPallets += truck.load
           shipping.trucksDispatched++
+          this.setTruckStatus(truck, 'departing')
           this.log('info', truck.id, `출하 트럭 ${truck.id} 출발 (팔레트 ${truck.load}개)`)
-          this.emit({ type: 'truckDeparted', ts: this.state.time, truckId: truck.id, pallets: truck.load })
+          this.allocateShipment(truck)
         }
         break
       case 'departing':
         truck.timer += h
         truck.x += Math.min(10, 0.5 + truck.timer * 2.5) * h
         if (truck.x >= TRUCK_OFFSCREEN_X) {
-          truck.status = 'away'
-          truck.timer = TRUCK_AWAY_TIME
+          truck.timer = this.uniform([TRUCK_AWAY_MIN, TRUCK_AWAY_MAX])
           truck.load = 0
+          this.setTruckStatus(truck, 'away')
         }
         break
     }
+  }
+
+  // ---------------------------------------------------------------- 출하 오더
+
+  private createOrder(extraLead = 0): void {
+    const now = this.state.time
+    const order: OrderState = {
+      id: `SO-${++this.orderSeq}`,
+      customer: CUSTOMERS[Math.floor(this.rng() * CUSTOMERS.length)],
+      pallets: Math.round(this.uniform(ORDER_PALLETS)),
+      shipped: 0,
+      createdAt: now,
+      dueAt: now + extraLead + this.uniform(ORDER_LEAD_TIME),
+    }
+    this.state.orders.push(order)
+    this.emit({ type: 'orderCreated', ts: now, orderId: order.id, customer: order.customer, pallets: order.pallets, dueAt: order.dueAt })
+  }
+
+  private tickOrders(): void {
+    while (this.state.time >= this.nextOrderAt) {
+      this.createOrder()
+      this.nextOrderAt += this.exponential(ORDER_MEAN_INTERVAL)
+    }
+  }
+
+  /** 출발 트럭의 팔레트를 납기가 빠른 오더부터 배정. 남는 팔레트는 물류센터 재고 보충분 */
+  private allocateShipment(truck: TruckState): void {
+    let remaining = truck.load
+    const open = [...this.state.orders].sort((a, b) => a.dueAt - b.dueAt)
+    for (const order of open) {
+      if (remaining <= 0) break
+      const n = Math.min(remaining, order.pallets - order.shipped)
+      order.shipped += n
+      remaining -= n
+      const completed = order.shipped >= order.pallets
+      this.emit({ type: 'orderShipped', ts: this.state.time, orderId: order.id, truckId: truck.id, pallets: n, completed })
+      if (completed) {
+        this.state.orders.splice(this.state.orders.indexOf(order), 1)
+        if (this.state.time > order.dueAt) this.log('warn', truck.id, `오더 ${order.id}(${order.customer}) 납기 지연 출하`)
+      }
+    }
+  }
+
+  // ---------------------------------------------------------------- 자재 입고
+
+  private tickWarehouse(): void {
+    const wh = this.state.warehouse
+    const now = this.state.time
+    if (!wh.expedited && wh.stock < EXPEDITE_THRESHOLD && wh.nextInboundAt - now > EXPEDITE_LEAD_TIME) {
+      wh.expedited = true
+      wh.nextInboundAt = now + EXPEDITE_LEAD_TIME
+      this.log('warn', 'WH', `원자재 재고 ${wh.stock}팔레트, 긴급 발주`)
+    }
+    if (now < wh.nextInboundAt) return
+    const pallets = Math.min(this.layout.warehouse.capacity - wh.stock, Math.round(this.uniform(INBOUND_PALLETS)))
+    wh.stock += pallets
+    this.emit({ type: 'materialReceived', ts: now, pallets, expedited: wh.expedited })
+    this.log('info', 'WH', `원자재 ${pallets}팔레트 입고${wh.expedited ? ' (긴급)' : ''}`)
+    wh.expedited = false
+    wh.nextInboundAt = now + this.uniform(INBOUND_INTERVAL)
   }
 }

@@ -1,6 +1,6 @@
 import type { StationKind } from '../domain/types'
 
-export type AssetKind = StationKind | 'agv'
+export type AssetKind = StationKind | 'agv' | 'warehouse' | 'line'
 
 export interface SensorSpec {
   tag: string
@@ -17,7 +17,7 @@ export interface SensorSpec {
   whileRunning?: boolean
 }
 
-/** 설비 유형별 가상 센서 목록. 데이터 생성·알람·화면이 모두 이 정의를 따른다. */
+/** 자산 유형별 가상 센서·계측 목록. 데이터 생성·알람·화면이 모두 이 정의를 따른다. */
 export const SENSOR_CATALOG: Record<AssetKind, SensorSpec[]> = {
   cnc: [
     { tag: 'vibration', label: '스핀들 진동', unit: 'mm/s', digits: 2, nominal: 1.6, limits: { direction: 'high', warn: 4.5, crit: 6 }, health: true, whileRunning: true },
@@ -38,6 +38,8 @@ export const SENSOR_CATALOG: Record<AssetKind, SensorSpec[]> = {
     { tag: 'airPressure', label: '공압', unit: 'bar', digits: 2, nominal: 6.1, limits: { direction: 'low', warn: 5.4, crit: 5 }, health: true },
     { tag: 'motorTemp', label: '모터 온도', unit: '°C', digits: 1, nominal: 45, limits: { direction: 'high', warn: 60, crit: 66 } },
   ],
+  warehouse: [{ tag: 'stock', label: '원자재 재고', unit: '팔레트', digits: 0, nominal: 96, limits: { direction: 'low', warn: 30, crit: 15 } }],
+  line: [{ tag: 'inputUnits', label: '투입 대기 자재', unit: '개', digits: 0, nominal: 24, limits: { direction: 'low', warn: 3, crit: 0 } }],
   agv: [
     { tag: 'battery', label: '배터리', unit: '%', digits: 0, nominal: 100, limits: { direction: 'low', warn: 25, crit: 15 }, health: true },
     { tag: 'speed', label: '주행 속도', unit: 'm/s', digits: 2, nominal: 3 },
@@ -46,3 +48,6 @@ export const SENSOR_CATALOG: Record<AssetKind, SensorSpec[]> = {
 
 /** 텔레메트리 샘플링 주기(시뮬레이션 초) */
 export const TELEMETRY_INTERVAL = 1
+
+/** 재고 부족 알림으로 분류하는 태그 */
+export const STOCK_TAGS = ['stock', 'inputUnits']

@@ -1,5 +1,5 @@
-import { SENSOR_CATALOG, type AssetKind, type SensorSpec } from '../data/sensorCatalog'
-import { DEFECT_TYPES, type DefectType, type FactoryLayout, type PlantEvent, type StationStatus } from '../domain/types'
+import { SENSOR_CATALOG, STOCK_TAGS, type AssetKind, type SensorSpec } from '../data/sensorCatalog'
+import { DEFECT_TYPES, type DefectType, type FactoryLayout, type PlantEvent, type StationStatus, type TruckStatus } from '../domain/types'
 import { AlarmEngine, type AlarmRecord } from './alarms'
 import type { MessageBus, PlantMessage, TelemetryMessage } from './bus'
 import { RingBuffer } from './ringBuffer'
@@ -16,6 +16,8 @@ export const BUCKET_SECONDS = 300
 export const BUCKET_COUNT = 12
 const LEAD_TIME_SAMPLES = 50
 const RATE_WINDOW = 60
+/** 완료 오더 보관 개수 */
+const ORDER_HISTORY = 40
 
 interface AssetInfo {
   id: string
@@ -69,6 +71,37 @@ export interface LineAnalytics extends OeeBreakdown {
   defects: { type: DefectType; count: number }[]
 }
 
+export interface OrderView {
+  id: string
+  customer: string
+  pallets: number
+  shipped: number
+  createdAt: number
+  dueAt: number
+  completedAt: number | null
+  /** 납기를 넘겼는지(완료 오더는 완료 시각 기준, 미완료는 현재 기준) */
+  late: boolean
+}
+
+export interface OrderAnalytics {
+  list: OrderView[]
+  open: number
+  overdueOpen: number
+  completed: number
+  completedOnTime: number
+  /** 납기 준수율(완료 오더 기준). 완료 오더가 없으면 null */
+  onTimeRate: number | null
+}
+
+export interface LogisticsAnalytics {
+  docksInUse: number
+  dockCount: number
+  /** 도크로 오가거나 접안 중인 트럭 */
+  activeTrucks: number
+  /** 재고 부족 알림(창고 재고·라인 투입 자재) */
+  stockAlerts: number
+}
+
 export interface SeriesData {
   spec: SensorSpec
   points: [number, number][]
@@ -81,6 +114,8 @@ export interface AnalyticsSnapshot {
   alarms: AlarmRecord[]
   activeAlarmCount: { warn: number; crit: number; unacknowledged: number }
   plant: OeeBreakdown
+  orders: OrderAnalytics
+  logistics: LogisticsAnalytics
   lines: Record<string, LineAnalytics>
   stations: Record<string, StationAnalytics>
   /** 선택된 자산의 센서 시계열(선택이 없거나 라인이면 null) */
@@ -127,6 +162,8 @@ export class DataProcessor {
   private readonly stationAccounts = new Map<string, StationAccount>()
   private readonly lineAccounts = new Map<string, LineAccount>()
   private readonly rate: { second: number; count: number }[] = []
+  private readonly orders = new Map<string, OrderView>()
+  private readonly docks = new Map<string, TruckStatus>()
   private startTs: number | null = null
   private now = 0
   private messageCount = 0
@@ -151,6 +188,11 @@ export class DataProcessor {
     for (const agv of layout.agv.fleet) {
       this.assets.set(agv.id, { id: agv.id, name: agv.name, kind: 'agv', lineId: null, sensors: SENSOR_CATALOG.agv })
     }
+    this.assets.set('WH', { id: 'WH', name: '자재창고', kind: 'warehouse', lineId: null, sensors: SENSOR_CATALOG.warehouse })
+    for (const line of layout.lines) {
+      this.assets.set(line.id, { id: line.id, name: line.name, kind: 'line', lineId: line.id, sensors: SENSOR_CATALOG.line })
+    }
+    for (const dock of layout.shipping.docks) this.docks.set(dock.id, 'away')
     bus.subscribe((message) => this.handle(message))
   }
 
@@ -244,8 +286,48 @@ export class DataProcessor {
         if (line.leadTimes.length > LEAD_TIME_SAMPLES) line.leadTimes.shift()
         break
       }
-      case 'truckDeparted':
+      case 'truckState':
+        this.docks.set(event.dockId, event.state)
         break
+      case 'orderCreated':
+        this.orders.set(event.orderId, {
+          id: event.orderId,
+          customer: event.customer,
+          pallets: event.pallets,
+          shipped: 0,
+          createdAt: event.ts,
+          dueAt: event.dueAt,
+          completedAt: null,
+          late: false,
+        })
+        break
+      case 'orderShipped': {
+        const order = this.orders.get(event.orderId)
+        if (!order) return
+        order.shipped += event.pallets
+        if (event.completed) {
+          order.completedAt = event.ts
+          order.late = event.ts > order.dueAt
+          this.completedCount++
+          if (!order.late) this.completedOnTime++
+          this.trimOrders()
+        }
+        break
+      }
+      case 'materialReceived':
+        break
+    }
+  }
+
+  /** 완료 오더는 최근 ORDER_HISTORY건만 보관(납기 준수 집계는 누적 카운터로 유지) */
+  private completedCount = 0
+  private completedOnTime = 0
+
+  private trimOrders(): void {
+    const done = [...this.orders.values()].filter((o) => o.completedAt !== null)
+    if (done.length > ORDER_HISTORY) {
+      done.sort((a, b) => a.completedAt! - b.completedAt!)
+      for (const o of done.slice(0, done.length - ORDER_HISTORY)) this.orders.delete(o.id)
     }
   }
 
@@ -311,6 +393,20 @@ export class DataProcessor {
     return { health, etaSeconds: eta > 0 && eta < ETA_HORIZON ? eta : null }
   }
 
+  private orderAnalytics(): OrderAnalytics {
+    const list = [...this.orders.values()].map((o) => ({ ...o, late: o.completedAt === null ? this.now > o.dueAt : o.late }))
+    const open = list.filter((o) => o.completedAt === null).sort((a, b) => a.dueAt - b.dueAt)
+    const done = list.filter((o) => o.completedAt !== null).sort((a, b) => b.completedAt! - a.completedAt!)
+    return {
+      list: [...open, ...done],
+      open: open.length,
+      overdueOpen: open.filter((o) => o.late).length,
+      completed: this.completedCount,
+      completedOnTime: this.completedOnTime,
+      onTimeRate: this.completedCount > 0 ? this.completedOnTime / this.completedCount : null,
+    }
+  }
+
   snapshot(selectedId: string | null): AnalyticsSnapshot {
     const lines: Record<string, LineAnalytics> = {}
     const currentBucket = Math.floor(this.now / BUCKET_SECONDS)
@@ -335,8 +431,8 @@ export class DataProcessor {
     const avg = (key: keyof OeeBreakdown) => lineList.reduce((s, l) => s + l[key], 0) / Math.max(1, lineList.length)
 
     const stations: Record<string, StationAnalytics> = {}
-    for (const [id, asset] of this.assets) {
-      if (asset.kind === 'agv') continue
+    for (const id of this.stationAccounts.keys()) {
+      const asset = this.assets.get(id)!
       stations[id] = { oee: this.stationOee(id), ...this.prediction(asset), latest: this.latest.get(id) ?? {} }
     }
 
@@ -359,6 +455,13 @@ export class DataProcessor {
         unacknowledged: active.filter((a) => !a.acknowledged).length,
       },
       plant: { oee: avg('oee'), availability: avg('availability'), performance: avg('performance'), quality: avg('quality') },
+      orders: this.orderAnalytics(),
+      logistics: {
+        docksInUse: [...this.docks.values()].filter((s) => s === 'docked').length,
+        dockCount: this.docks.size,
+        activeTrucks: [...this.docks.values()].filter((s) => s !== 'away').length,
+        stockAlerts: active.filter((a) => STOCK_TAGS.includes(a.tag)).length,
+      },
       lines,
       stations,
       selectedSeries: selected

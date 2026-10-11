@@ -14,12 +14,6 @@ export const CubeIcon = () => (
     <path d="M3 7l9 5 9-5M12 12v10" />
   </Icon>
 )
-export const GaugeIcon = () => (
-  <Icon>
-    <path d="M12 14l4-4" />
-    <path d="M3.3 17a9 9 0 1 1 17.4 0" />
-  </Icon>
-)
 export const CheckIcon = () => (
   <Icon>
     <path d="M20 6 9 17l-5-5" />
@@ -66,5 +60,17 @@ export const BellIcon = () => (
   <Icon>
     <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
     <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+  </Icon>
+)
+export const ClockIcon = () => (
+  <Icon>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </Icon>
+)
+export const AlertIcon = () => (
+  <Icon>
+    <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+    <path d="M12 9v4M12 17h.01" />
   </Icon>
 )

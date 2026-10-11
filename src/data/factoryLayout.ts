@@ -83,12 +83,15 @@ export const factoryLayout: FactoryLayout = {
       { id: 'AGV-05', name: 'AGV-05', startAt: 0.82 },
     ],
   },
-  warehouse: { minX: -42, maxX: -28, minZ: -20, maxZ: 20, pickup: { x: -26.4, z: 14 } },
+  warehouse: { minX: -42, maxX: -28, minZ: -20, maxZ: 20, pickup: { x: -26.4, z: 14 }, capacity: 140, initialStock: 70 },
   shipping: {
     stagingOrigin: { x: 29.5, z: 11 },
     stagingCapacity: 10,
     truckCapacity: 6,
     dockX: 40,
-    dockZ: 15,
+    docks: [
+      { id: 'DOCK-1', name: '1번 도크', z: 12.4 },
+      { id: 'DOCK-2', name: '2번 도크', z: 17.6 },
+    ],
   },
 }

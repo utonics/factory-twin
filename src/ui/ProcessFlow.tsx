@@ -4,9 +4,9 @@ import { useFactoryStore } from '../store/useFactoryStore'
 import { STATION_STATUS_LABEL, TRUCK_STATUS_LABEL } from './labels'
 import { TruckIcon } from './icons'
 
-/** 라인별 공정 흐름(투입 → 4개 공정 → 팔레트)과 출하 트럭 요약 */
+/** 라인별 공정 흐름(투입 → 4개 공정 → 팔레트)과 출하 도크 요약 */
 export function ProcessFlow() {
-  const { lines, stations, truck } = useFactoryStore((s) => s.snapshot)
+  const { lines, stations, docks, shipping } = useFactoryStore((s) => s.snapshot)
   const select = useFactoryStore((s) => s.select)
   const [lineId, setLineId] = useState(lines[0]?.id)
   const line = lines.find((l) => l.id === lineId) ?? lines[0]
@@ -54,18 +54,26 @@ export function ProcessFlow() {
           </li>
         </ol>
       </div>
-      <button type="button" className="truck-card" onClick={() => select('TRUCK')}>
-        <span className="truck-icon">
-          <TruckIcon />
-        </span>
-        <span>
-          <b>{truck.status === 'away' ? '다음 트럭 대기' : truck.id}</b>
-          <small>
-            {TRUCK_STATUS_LABEL[truck.status]} · 상차 {truck.load}/{truck.capacity}
-          </small>
-          <small className="muted">적치장 {truck.staged}/{truck.stagingCapacity} 팔레트</small>
-        </span>
-      </button>
+      <div className="dock-summary">
+        <div className="dock-summary-head">
+          <span className="truck-icon">
+            <TruckIcon />
+          </span>
+          <span>
+            <b>출하 도크</b>
+            <small className="muted">
+              적치장 {shipping.staged}/{shipping.stagingCapacity} 팔레트
+            </small>
+          </span>
+        </div>
+        {docks.map((d) => (
+          <button type="button" key={d.dockId} className="dock-row" onClick={() => select(d.dockId)}>
+            <span>{d.dockName}</span>
+            <b>{d.status === 'away' ? '비어 있음' : d.truckId}</b>
+            <small>{d.status === 'away' ? '' : `${TRUCK_STATUS_LABEL[d.status]} · ${d.load}/${d.capacity}`}</small>
+          </button>
+        ))}
+      </div>
     </section>
   )
 }
