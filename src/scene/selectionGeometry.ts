@@ -21,8 +21,8 @@ export function locateSelection(id: string): { x: number; z: number; rotY: numbe
   }
   const dockIndex = layout.shipping.docks.findIndex((d) => d.id === id)
   if (dockIndex >= 0) {
-    const t = state.shipping.trucks[dockIndex]
-    return { x: t.status === 'away' ? truckDockedX(layout) : t.x, z: layout.shipping.docks[dockIndex].z, rotY: 0 }
+    // 도크 선택은 도크 위치에 고정(출발하는 트럭을 따라가지 않음)
+    return { x: truckDockedX(layout), z: layout.shipping.docks[dockIndex].z, rotY: 0 }
   }
   for (const line of layout.lines) {
     if (line.id === id) return { x: (line.xStart + line.xEnd) / 2 + 0.6, z: line.z, rotY: 0 }

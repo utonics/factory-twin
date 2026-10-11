@@ -10,7 +10,7 @@ import {
   TRUCK_STATUS_LABEL,
 } from './labels'
 
-export interface SelectionInfo {
+interface SelectionInfo {
   kindLabel: string
   title: string
   subtitle: string

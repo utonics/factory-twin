@@ -5,8 +5,8 @@ import type { AreaId } from '../scene/areas'
 import { processor, simulation } from '../runtime'
 import { createSnapshot, type FactorySnapshot } from '../sim/snapshot'
 
-export type CameraCommand = { type: 'zoomIn' | 'zoomOut' } | { type: 'focus'; areaId: AreaId }
-export type ListTab = 'stations' | 'agvs' | 'orders' | 'alarms' | 'events'
+type CameraCommand = { type: 'zoomIn' | 'zoomOut' } | { type: 'focus'; areaId: AreaId }
+type ListTab = 'stations' | 'agvs' | 'orders' | 'alarms' | 'events'
 /** AGV 상태 필터(비슷한 상태는 묶음) */
 export type AgvFilter = 'all' | 'moving' | 'queued' | 'handling' | 'charging'
 
@@ -19,7 +19,8 @@ interface FactoryStore {
   /** 데이터 처리 결과(OEE·알람·센서 시계열) */
   analytics: AnalyticsSnapshot
   listTab: ListTab
-  area: AreaId
+  /** 마지막으로 이동한 구역. 사용자가 카메라를 직접 움직이면 null */
+  area: AreaId | null
   /** 상태 필터: 해당 상태의 설비·AGV만 목록에 남기고 장면에서는 나머지를 흐리게 */
   stationFilter: StationStatus | 'all'
   agvFilter: AgvFilter
@@ -32,6 +33,7 @@ interface FactoryStore {
   refreshSnapshot: () => void
   setListTab: (tab: ListTab) => void
   setArea: (area: AreaId) => void
+  clearArea: () => void
   setStationFilter: (filter: StationStatus | 'all') => void
   setAgvFilter: (filter: AgvFilter) => void
   setDelayedOnly: (value: boolean) => void
@@ -57,6 +59,7 @@ export const useFactoryStore = create<FactoryStore>((set, get) => ({
   refreshSnapshot: () => set({ snapshot: createSnapshot(simulation), analytics: processor.snapshot(get().selectedId) }),
   setListTab: (tab) => set({ listTab: tab }),
   setArea: (area) => set({ area, cameraCommand: { type: 'focus', areaId: area, nonce: Math.random() } }),
+  clearArea: () => set({ area: null }),
   setStationFilter: (filter) => set({ stationFilter: filter }),
   setAgvFilter: (filter) => set({ agvFilter: filter }),
   setDelayedOnly: (value) => set({ delayedOnly: value }),

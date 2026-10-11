@@ -1,9 +1,10 @@
 import { useFrame } from '@react-three/fiber'
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import { BoxGeometry, Object3D, type InstancedMesh } from 'three'
 import { simulation } from '../runtime'
 import { createRng } from '../sim/random'
 import { Selectable } from './Selectable'
+import { StaticInstances, type InstanceTransform } from './StaticInstances'
 import { COLORS } from './theme'
 
 const ROW_XS = [-40.5, -36, -31.5]
@@ -14,15 +15,17 @@ const HEIGHT = 4.8
 
 interface RackParts {
   uprights: [number, number, number][]
-  beams: { x: number; y: number; z: number; length: number }[]
+  /** 빔은 모두 같은 길이 */
+  beams: InstanceTransform[]
+  beamLength: number
   loads: [number, number, number][]
 }
 
 function buildRacks(): RackParts {
   const { minZ, maxZ } = simulation.layout.warehouse
   const rng = createRng(4242)
-  const parts: RackParts = { uprights: [], beams: [], loads: [] }
   const bays = Math.floor((maxZ - minZ) / BAY)
+  const parts: RackParts = { uprights: [], beams: [], beamLength: bays * BAY, loads: [] }
   const z0 = minZ + ((maxZ - minZ) - bays * BAY) / 2
   for (const x of ROW_XS) {
     for (let b = 0; b <= bays; b++) {
@@ -30,7 +33,7 @@ function buildRacks(): RackParts {
       parts.uprights.push([x - DEPTH / 2, HEIGHT / 2, z], [x + DEPTH / 2, HEIGHT / 2, z])
     }
     for (const y of LEVELS) {
-      for (const side of [-1, 1]) parts.beams.push({ x: x + side * (DEPTH / 2), y: y + 0.05, z: z0 + (bays * BAY) / 2, length: bays * BAY })
+      for (const side of [-1, 1]) parts.beams.push({ position: [x + side * (DEPTH / 2), y + 0.05, z0 + (bays * BAY) / 2] })
       for (let b = 0; b < bays; b++) parts.loads.push([x, y + 0.1, z0 + b * BAY + BAY / 2])
     }
   }
@@ -53,6 +56,7 @@ export function Warehouse() {
     }),
     [],
   )
+  useEffect(() => () => Object.values(geometries).forEach((g) => g.dispose()), [geometries])
   const uprights = useRef<InstancedMesh>(null)
   const pallets = useRef<InstancedMesh>(null)
   const loads = useRef<InstancedMesh>(null)
@@ -88,12 +92,10 @@ export function Warehouse() {
       <instancedMesh ref={uprights} args={[geometries.upright, undefined, parts.uprights.length]} castShadow>
         <meshStandardMaterial color={COLORS.primary} />
       </instancedMesh>
-      {parts.beams.map((b, i) => (
-        <mesh key={i} position={[b.x, b.y, b.z]} castShadow>
-          <boxGeometry args={[0.08, 0.12, b.length]} />
-          <meshStandardMaterial color="#f08c1a" />
-        </mesh>
-      ))}
+      <StaticInstances instances={parts.beams}>
+        <boxGeometry args={[0.08, 0.12, parts.beamLength]} />
+        <meshStandardMaterial color="#f08c1a" />
+      </StaticInstances>
       <instancedMesh ref={pallets} args={[geometries.pallet, undefined, parts.loads.length]} castShadow>
         <meshStandardMaterial color={COLORS.pallet} />
       </instancedMesh>

@@ -1,7 +1,7 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { BoxGeometry, CylinderGeometry, Object3D, type BufferGeometry, type InstancedMesh } from 'three'
-import type { ItemStage, ItemState, LineSpec } from '../domain/types'
+import type { ItemStage, LineSpec } from '../domain/types'
 import { simulation } from '../runtime'
 import { REJECT_BIN_OFFSET } from './stations/InspectionStation'
 import { BELT_Y, COLORS } from './theme'
@@ -27,6 +27,14 @@ export function Products() {
     ],
     [],
   )
+  useEffect(() => () => visuals.forEach((v) => v.geometry.dispose()), [visuals])
+  // 단계 → 형상 인덱스, 형상별 개수(프레임마다 재사용)
+  const visualOf = useMemo(() => {
+    const map = {} as Record<ItemStage, number>
+    visuals.forEach((v, i) => v.stages.forEach((stage) => (map[stage] = i)))
+    return map
+  }, [visuals])
+  const counts = useMemo(() => visuals.map(() => 0), [visuals])
   const meshes = useRef<(InstancedMesh | null)[]>([])
   const dummy = useMemo(() => new Object3D(), [])
   const lineById = useMemo(() => {
@@ -44,11 +52,11 @@ export function Products() {
   }, [])
 
   useFrame(() => {
-    const counts = visuals.map(() => 0)
-    const place = (item: ItemState) => {
-      const vi = visuals.findIndex((v) => v.stages.includes(item.stage))
+    counts.fill(0)
+    for (const item of simulation.state.items.values()) {
+      const vi = visualOf[item.stage]
       const mesh = meshes.current[vi]
-      if (!mesh || counts[vi] >= CAPACITY) return
+      if (!mesh || counts[vi] >= CAPACITY) continue
       const line = lineById[item.lineId]
       const h = visuals[vi].height
       dummy.rotation.set(0, 0, 0)
@@ -70,7 +78,6 @@ export function Products() {
       dummy.updateMatrix()
       mesh.setMatrixAt(counts[vi]++, dummy.matrix)
     }
-    for (const item of simulation.state.items.values()) place(item)
     visuals.forEach((_, i) => {
       const mesh = meshes.current[i]
       if (!mesh) return

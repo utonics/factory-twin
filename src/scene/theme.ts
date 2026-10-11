@@ -7,7 +7,6 @@ export const COLORS = {
   floor: '#f3f5f8',
   wall: '#fbfcfd',
   primary: '#2f5bea',
-  primaryDark: '#1d3fb8',
   accent: '#f5b301',
   steel: '#9aa4b2',
   steelDark: '#5b6472',

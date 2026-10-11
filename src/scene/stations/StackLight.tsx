@@ -2,6 +2,7 @@ import { useFrame } from '@react-three/fiber'
 import { useRef } from 'react'
 import type { MeshStandardMaterial } from 'three'
 import { simulation } from '../../runtime'
+import { dimFactor } from '../Dimmable'
 import { COLORS } from '../theme'
 
 const LAMPS = [
@@ -22,13 +23,13 @@ export function StackLight({ stationId, position }: { stationId: string; positio
       if (!mat) return
       const on = lamp.active(status) && (status !== 'down' || blink)
       mat.emissiveIntensity = on ? 2.2 : 0.05
-      mat.opacity = on ? 1 : 0.55
+      mat.opacity = (on ? 1 : 0.55) * dimFactor(mat)
     })
   })
 
   return (
     <group position={position}>
-      <mesh position={[0, 0.9, 0]} castShadow>
+      <mesh position={[0, 0.9, 0]}>
         <cylinderGeometry args={[0.04, 0.04, 1.8, 8]} />
         <meshStandardMaterial color={COLORS.steelDark} />
       </mesh>

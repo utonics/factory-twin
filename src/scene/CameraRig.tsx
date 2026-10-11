@@ -78,7 +78,9 @@ export function CameraRig() {
       screenSpacePanning={false}
       onChange={clampTarget}
       onStart={() => {
+        // 사용자가 직접 움직이면 진행 중인 이동을 멈추고 구역 선택을 해제(같은 구역을 다시 고를 수 있게)
         flight.current = null
+        useFactoryStore.getState().clearArea()
       }}
     />
   )

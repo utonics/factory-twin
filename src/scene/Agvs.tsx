@@ -1,6 +1,7 @@
 import { useFrame } from '@react-three/fiber'
-import { useRef } from 'react'
-import type { Group, Mesh, MeshStandardMaterial } from 'three'
+import { useEffect, useMemo, useRef } from 'react'
+import { MeshStandardMaterial, type Group, type Mesh } from 'three'
+import type { AgvStatus } from '../domain/types'
 import { simulation } from '../runtime'
 import { matchesAgvFilter } from '../store/filters'
 import { useFactoryStore } from '../store/useFactoryStore'
@@ -16,7 +17,13 @@ function AgvModel({ index }: { index: number }) {
   const body = useRef<Group>(null)
   const deck = useRef<Mesh>(null)
   const beacon = useRef<Mesh>(null)
-  const led = useRef<MeshStandardMaterial>(null)
+  // 양쪽 LED가 같은 재질을 공유해 상태 색이 함께 바뀐다
+  const ledMaterial = useMemo(
+    () => new MeshStandardMaterial({ color: COLORS.primary, emissive: COLORS.primary, emissiveIntensity: 1.2, toneMapped: false }),
+    [],
+  )
+  useEffect(() => () => ledMaterial.dispose(), [ledMaterial])
+  const ledStatus = useRef<AgvStatus | null>(null)
 
   useFrame(({ clock }) => {
     const agv = simulation.state.agvs[index]
@@ -30,9 +37,10 @@ function AgvModel({ index }: { index: number }) {
       beacon.current.rotation.y = clock.elapsedTime * 6
       beacon.current.visible = agv.status === 'moving' || agv.status === 'queued'
     }
-    if (led.current) {
-      led.current.color.set(AGV_STATUS_COLOR[agv.status])
-      led.current.emissive.set(AGV_STATUS_COLOR[agv.status])
+    if (ledStatus.current !== agv.status) {
+      ledStatus.current = agv.status
+      ledMaterial.color.set(AGV_STATUS_COLOR[agv.status])
+      ledMaterial.emissive.set(AGV_STATUS_COLOR[agv.status])
     }
   })
 
@@ -56,9 +64,8 @@ function AgvModel({ index }: { index: number }) {
           </mesh>
           {/* 측면 상태 LED */}
           {[-1, 1].map((side) => (
-            <mesh key={side} position={[0, 0.24, side * (WIDTH / 2 + 0.005)]}>
+            <mesh key={side} position={[0, 0.24, side * (WIDTH / 2 + 0.005)]} material={ledMaterial}>
               <boxGeometry args={[LENGTH * 0.7, 0.06, 0.01]} />
-              <meshStandardMaterial ref={side === 1 ? led : undefined} color={COLORS.primary} emissive={COLORS.primary} emissiveIntensity={1.2} toneMapped={false} />
             </mesh>
           ))}
           {/* 전면 라이다 */}

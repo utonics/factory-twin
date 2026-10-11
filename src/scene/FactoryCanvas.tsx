@@ -22,7 +22,9 @@ function SimulationDriver() {
   const elapsed = useRef(0)
   useFrame((_, delta) => {
     const { paused, speed, refreshSnapshot } = useFactoryStore.getState()
-    if (!paused) plant.step(Math.min(delta, 0.1) * speed)
+    // 일시정지 중에는 데이터가 바뀌지 않으므로 UI 갱신도 건너뛴다(선택·확인 등은 스토어가 즉시 갱신)
+    if (paused) return
+    plant.step(Math.min(delta, 0.1) * speed)
     elapsed.current += delta
     if (elapsed.current >= SNAPSHOT_INTERVAL) {
       elapsed.current = 0

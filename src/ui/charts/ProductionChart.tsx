@@ -21,14 +21,16 @@ function columnPath(x: number, y: number, w: number, h: number): string {
 
 /** 5분 단위 양품 생산량(단일 계열 컬럼, 최근 1시간 12칸). 진행 중인 구간은 옅게 표시 */
 export function ProductionChart({ buckets, now }: ProductionChartProps) {
-  const [hover, setHover] = useState<number | null>(null)
+  // 구간이 밀려도 같은 구간을 가리키도록 시작 시각을 기억
+  const [hoverStart, setHoverStart] = useState<number | null>(null)
   if (buckets.length === 0) return <p className="muted small">집계 데이터가 아직 없습니다.</p>
   const max = Math.max(1, ...buckets.map((b) => b.good))
   // 데이터가 적어도 칸 너비를 고정해 막대가 벌어지지 않게 한다
   const slot = WIDTH / BUCKET_COUNT
   const barW = Math.min(BAR_MAX, slot - 4)
   const last = buckets.length - 1
-  const hovered = hover !== null ? buckets[hover] : null
+  const hover = buckets.findIndex((b) => b.start === hoverStart)
+  const hovered = hover >= 0 ? buckets[hover] : null
 
   return (
     <div className="production-chart">
@@ -39,14 +41,14 @@ export function ProductionChart({ buckets, now }: ProductionChartProps) {
             const h = (b.good / max) * (HEIGHT - 6)
             const x = i * slot + (slot - barW) / 2
             return (
-              <g key={b.start} onPointerEnter={() => setHover(i)} onPointerLeave={() => setHover(null)}>
+              <g key={b.start} onPointerEnter={() => setHoverStart(b.start)} onPointerLeave={() => setHoverStart(null)}>
                 <rect x={i * slot} y={0} width={slot} height={HEIGHT} fill="transparent" />
-                {h > 0 && <path d={columnPath(x, HEIGHT - h, barW, h)} fill={i === last ? CHART.seriesMuted : CHART.series} opacity={hover === null || hover === i ? 1 : 0.55} />}
+                {h > 0 && <path d={columnPath(x, HEIGHT - h, barW, h)} fill={i === last ? CHART.seriesMuted : CHART.series} opacity={hover < 0 || hover === i ? 1 : 0.55} />}
               </g>
             )
           })}
         </svg>
-        {hovered && hover !== null && (
+        {hovered && (
           <div className="chart-tooltip" style={{ left: `${Math.min(72, Math.max(28, ((hover + 0.5) / BUCKET_COUNT) * 100))}%` }}>
             {formatClock(hovered.start).slice(0, 5)}~{formatClock(Math.min(now, hovered.start + BUCKET_SECONDS)).slice(0, 5)}
             {hover === last ? ' (진행 중)' : ''} · 양품 <b>{hovered.good}</b> · 불량 <b>{hovered.ng}</b>

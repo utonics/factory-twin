@@ -3,7 +3,7 @@ import { factoryLayout } from '../data/factoryLayout'
 
 export type AreaId = 'all' | 'warehouse' | 'L1' | 'L2' | 'shipping' | 'charging'
 
-export interface Area {
+interface Area {
   id: AreaId
   label: string
   target: [number, number, number]

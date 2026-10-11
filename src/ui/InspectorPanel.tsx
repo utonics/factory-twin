@@ -1,3 +1,4 @@
+import { simulation } from '../runtime'
 import { useFactoryStore } from '../store/useFactoryStore'
 import { LineAnalyticsSection, SensorSeriesSection, StationAnalyticsSection } from './AnalyticsSections'
 import { CloseIcon, HomeIcon, MinusIcon, PlusIcon } from './icons'
@@ -22,12 +23,16 @@ export function CameraToolbar() {
   )
 }
 
+const { layout } = simulation
+const STATION_IDS = new Set(layout.lines.flatMap((l) => l.stations.map((s) => s.id)))
+const AGV_IDS = new Set(layout.agv.fleet.map((a) => a.id))
+const LINE_IDS = new Set(layout.lines.map((l) => l.id))
+
 function AnalyticsFor({ id }: { id: string }) {
-  const snapshot = useFactoryStore((s) => s.snapshot)
-  if (snapshot.stations.some((s) => s.id === id)) return <StationAnalyticsSection stationId={id} />
-  if (snapshot.agvs.some((a) => a.id === id)) return <SensorSeriesSection assetId={id} />
+  if (STATION_IDS.has(id)) return <StationAnalyticsSection stationId={id} />
+  if (AGV_IDS.has(id)) return <SensorSeriesSection assetId={id} />
   if (id === 'WH') return <SensorSeriesSection assetId={id} title="재고 추이" />
-  if (snapshot.lines.some((l) => l.id === id)) return <LineAnalyticsSection lineId={id} />
+  if (LINE_IDS.has(id)) return <LineAnalyticsSection lineId={id} />
   return null
 }
 

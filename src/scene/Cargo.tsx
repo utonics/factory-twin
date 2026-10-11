@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { BoxGeometry, Object3D, type InstancedMesh } from 'three'
 import type { CargoKind } from '../domain/types'
 import { simulation } from '../runtime'
@@ -20,11 +20,23 @@ interface PalletInstance {
   kind: CargoKind
 }
 
-/** 시뮬레이션 상태에서 화면에 놓일 팔레트(투입·배출 버퍼, AGV 적재물, 출하 적치장)를 계산 */
-function collectPallets(out: PalletInstance[]): void {
-  out.length = 0
+/**
+ * 시뮬레이션 상태에서 화면에 놓일 팔레트(투입·배출 버퍼, AGV 적재물, 출하 적치장)를 계산.
+ * 매 프레임 호출되므로 객체를 새로 만들지 않고 pool을 재사용하며, 채운 개수를 돌려준다.
+ */
+function collectPallets(pool: PalletInstance[]): number {
+  let count = 0
   const { state, layout, path } = simulation
-  const push = (x: number, z: number, units: number, kind: CargoKind, y = 0, rotY = 0) => out.push({ x, y, z, rotY, units, kind })
+  const push = (x: number, z: number, units: number, kind: CargoKind, y = 0, rotY = 0) => {
+    const p = pool[count] ?? (pool[count] = { x: 0, y: 0, z: 0, rotY: 0, units: 0, kind })
+    p.x = x
+    p.y = y
+    p.z = z
+    p.rotY = rotY
+    p.units = units
+    p.kind = kind
+    count++
+  }
 
   for (const spec of layout.lines) {
     const line = state.lines[spec.id]
@@ -54,6 +66,7 @@ function collectPallets(out: PalletInstance[]): void {
   for (let i = 0; i < state.shipping.staged; i++) {
     push(stagingOrigin.x + (i % 5) * 1.5, stagingOrigin.z + Math.floor(i / 5) * 1.5, 8, 'finished')
   }
+  return count
 }
 
 export function Cargo() {
@@ -61,17 +74,18 @@ export function Cargo() {
   const rawBoxes = useRef<InstancedMesh>(null)
   const finishedBoxes = useRef<InstancedMesh>(null)
   const dummy = useMemo(() => new Object3D(), [])
-  const list = useMemo<PalletInstance[]>(() => [], [])
+  const pool = useMemo<PalletInstance[]>(() => [], [])
   const geometries = useMemo(() => ({ pallet: new BoxGeometry(1.1, PALLET_H, 1.1), box: new BoxGeometry(BOX, BOX, BOX) }), [])
+  useEffect(() => () => Object.values(geometries).forEach((g) => g.dispose()), [geometries])
 
   useFrame(() => {
     if (!pallets.current || !rawBoxes.current || !finishedBoxes.current) return
-    collectPallets(list)
+    const count = Math.min(collectPallets(pool), PALLET_CAPACITY)
     let p = 0
     let raw = 0
     let fin = 0
-    for (const pallet of list) {
-      if (p >= PALLET_CAPACITY) break
+    for (let k = 0; k < count; k++) {
+      const pallet = pool[k]
       dummy.position.set(pallet.x, pallet.y + PALLET_H / 2, pallet.z)
       dummy.rotation.set(0, pallet.rotY, 0)
       dummy.updateMatrix()

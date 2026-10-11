@@ -17,7 +17,8 @@ interface SensorChartProps {
 
 /** 센서 1개의 최근 10분 추이(단일 계열 라인 + 임계치 기준선 + 호버 툴팁) */
 export function SensorChart({ spec, points, now }: SensorChartProps) {
-  const [hover, setHover] = useState<number | null>(null)
+  // 데이터가 매초 밀려도 같은 시점을 가리키도록 인덱스 대신 시각을 기억
+  const [hoverT, setHoverT] = useState<number | null>(null)
   const latest = points[points.length - 1]
   const level = latest && spec.limits ? evaluateLevel(latest[1], spec.limits, 0) : 0
 
@@ -39,13 +40,13 @@ export function SensorChart({ spec, points, now }: SensorChartProps) {
   const onMove = (e: PointerEvent<SVGSVGElement>) => {
     if (points.length === 0) return
     const rect = e.currentTarget.getBoundingClientRect()
-    const t = now - WINDOW + ((e.clientX - rect.left) / rect.width) * WINDOW
-    let best = 0
-    for (let i = 1; i < points.length; i++) if (Math.abs(points[i][0] - t) < Math.abs(points[best][0] - t)) best = i
-    setHover(best)
+    setHoverT(now - WINDOW + ((e.clientX - rect.left) / rect.width) * WINDOW)
   }
 
-  const hovered = hover !== null ? points[hover] : null
+  let hovered: [number, number] | null = null
+  if (hoverT !== null) {
+    for (const p of points) if (!hovered || Math.abs(p[0] - hoverT) < Math.abs(hovered[0] - hoverT)) hovered = p
+  }
   const fmt = (v: number) => `${v.toFixed(spec.digits)} ${spec.unit}`
 
   return (
@@ -62,7 +63,7 @@ export function SensorChart({ spec, points, now }: SensorChartProps) {
         </span>
       </div>
       <div className="chart-box">
-        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" onPointerMove={onMove} onPointerLeave={() => setHover(null)} role="img" aria-label={`${spec.label} 최근 10분 추이`}>
+        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" onPointerMove={onMove} onPointerLeave={() => setHoverT(null)} role="img" aria-label={`${spec.label} 최근 10분 추이`}>
           <line x1={0} x2={WIDTH} y1={HEIGHT - 0.5} y2={HEIGHT - 0.5} stroke={CHART.grid} strokeWidth={1} vectorEffect="non-scaling-stroke" />
           {spec.limits && (
             <>

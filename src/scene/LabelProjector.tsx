@@ -1,5 +1,5 @@
 import { useFrame } from '@react-three/fiber'
-import { useMemo } from 'react'
+import { useMemo, useRef } from 'react'
 import { Vector3 } from 'three'
 import { useFactoryStore } from '../store/useFactoryStore'
 import { labelElements, SELECTION_LABEL_ID, ZONE_LABELS } from './sceneLabels'
@@ -8,6 +8,7 @@ import { locateSelection, selectionFrame } from './selectionGeometry'
 /** 3D 앵커를 화면 좌표로 투영해 DOM 라벨 위치를 갱신한다 */
 export function LabelProjector() {
   const v = useMemo(() => new Vector3(), [])
+  const frameCache = useRef<{ id: string; height: number } | null>(null)
 
   useFrame(({ camera, size }) => {
     const place = (id: string) => {
@@ -30,7 +31,8 @@ export function LabelProjector() {
     const selectedId = useFactoryStore.getState().selectedId
     const loc = selectedId ? locateSelection(selectedId) : null
     if (selectedId && loc) {
-      v.set(loc.x, selectionFrame(selectedId).h + 0.6, loc.z)
+      if (frameCache.current?.id !== selectedId) frameCache.current = { id: selectedId, height: selectionFrame(selectedId).h }
+      v.set(loc.x, frameCache.current.height + 0.6, loc.z)
       place(SELECTION_LABEL_ID)
     }
   })

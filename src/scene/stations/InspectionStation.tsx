@@ -3,6 +3,7 @@ import { useRef } from 'react'
 import type { Mesh, MeshStandardMaterial } from 'three'
 import type { StationSpec } from '../../domain/types'
 import { simulation } from '../../runtime'
+import { dimFactor } from '../Dimmable'
 import { BELT_Y, COLORS } from '../theme'
 
 /** 불량품 배출함 위치(설비 기준). Products 레이어와 공유 */
@@ -14,6 +15,7 @@ export function InspectionStation({ spec }: { spec: StationSpec }) {
   const scanner = useRef<Mesh>(null)
   const beam = useRef<MeshStandardMaterial>(null)
   const result = useRef<MeshStandardMaterial>(null)
+  const resultKey = useRef('')
 
   useFrame(() => {
     const st = simulation.state.stations[spec.id]
@@ -22,14 +24,18 @@ export function InspectionStation({ spec }: { spec: StationSpec }) {
       scanner.current.visible = scanning
       scanner.current.position.x = Math.sin(st.progress * Math.PI * 4) * 0.55
     }
-    if (beam.current) beam.current.opacity = scanning ? 0.55 : 0
+    if (beam.current) beam.current.opacity = (scanning ? 0.55 : 0) * dimFactor(beam.current)
     if (result.current) {
       const since = simulation.state.time - st.lastResultAt
       const active = since < RESULT_FLASH && st.lastResult !== null
-      const color = st.lastResult === 'ng' ? COLORS.ng : COLORS.ok
-      result.current.color.set(active ? color : '#d9dee6')
-      result.current.emissive.set(color)
-      result.current.emissiveIntensity = active ? 1.6 : 0
+      const key = `${active}:${st.lastResult}`
+      if (resultKey.current !== key) {
+        resultKey.current = key
+        const color = st.lastResult === 'ng' ? COLORS.ng : COLORS.ok
+        result.current.color.set(active ? color : '#d9dee6')
+        result.current.emissive.set(color)
+        result.current.emissiveIntensity = active ? 1.6 : 0
+      }
     }
   })
 

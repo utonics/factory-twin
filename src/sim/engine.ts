@@ -167,6 +167,7 @@ export class FactorySimulation {
       taskRemaining: 0,
       taskDuration: 0,
       battery: 95 - i * 9,
+      chargeUntil: 0,
       odometer: 0,
       deliveries: 0,
     }))
@@ -206,10 +207,6 @@ export class FactorySimulation {
 
     const warmup = options.warmup ?? 0
     if (warmup > 0) this.step(warmup)
-  }
-
-  stationSpec(id: string): StationSpec | undefined {
-    return this.stationSpecs[id]
   }
 
   /** 공장 이벤트 구독. 해제 함수를 돌려준다. */
@@ -358,7 +355,8 @@ export class FactorySimulation {
         st.repairRemaining = 0
         // 수리 시 마모 부품 교체
         st.wear = 0.02 + this.rng() * 0.06
-        this.setStatus(st, st.itemId === null ? 'idle' : st.progress < 1 ? 'processing' : 'blocked')
+        // 고장은 가공 중에만 발생하므로 복구 후에는 하던 가공을 이어 간다
+        this.setStatus(st, 'processing')
         this.log('info', spec.id, `${rt.spec.name} ${spec.name} 복구 완료`)
       }
       return
@@ -462,7 +460,7 @@ export class FactorySimulation {
           break
         case 'charging':
           agv.battery = Math.min(100, agv.battery + AGV_CHARGE_PER_SEC * h)
-          if (agv.battery >= AGV_RESUME_BATTERY && this.transportDemand() > 0) this.depart(agv)
+          if (agv.battery >= agv.chargeUntil && this.transportDemand() > 0) this.depart(agv)
           break
         default:
           this.drive(agv, h)
@@ -581,7 +579,9 @@ export class FactorySimulation {
         break
       case 'park':
         agv.status = 'charging'
-        if (agv.battery < AGV_LOW_BATTERY) this.log('warn', agv.id, `${agv.name} 배터리 부족, 충전 시작`)
+        // 배터리 부족으로 들어오면 일정 수준까지 충전, 일이 없어 쉬러 온 경우는 수요가 생기면 바로 출발
+        agv.chargeUntil = agv.battery < AGV_LOW_BATTERY ? AGV_RESUME_BATTERY : 0
+        if (agv.chargeUntil > 0) this.log('warn', agv.id, `${agv.name} 배터리 부족, 충전 시작`)
         break
     }
   }

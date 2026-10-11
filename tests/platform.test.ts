@@ -150,6 +150,8 @@ describe('출하 오더·도크·재고', () => {
     simulation.subscribe((e) => {
       if (e.type === 'materialReceived' && e.expedited) expedited = true
     })
+    // 긴급 발주 기준(32팔레트) 아래로 재고를 낮춘 상태에서 시작
+    simulation.state.warehouse.stock = 20
     for (let i = 0; i < 720; i++) {
       plant.step(10)
       const { stock } = simulation.state.warehouse
@@ -157,5 +159,24 @@ describe('출하 오더·도크·재고', () => {
       expect(stock).toBeLessThanOrEqual(factoryLayout.warehouse.capacity)
     }
     expect(expedited).toBe(true)
+    expect(simulation.state.warehouse.stock).toBeGreaterThan(20)
+  })
+})
+
+describe('알람 디바운스 보완', () => {
+  it('경고·위험 구간을 오가도 경고 이상이 이어지면 알람이 발생한다', () => {
+    const engine = new AlarmEngine()
+    for (let t = 0; t <= 6; t++) engine.evaluate(t, 'X', '설비 X', vibration, t % 2 === 0 ? 6.2 : 5)
+    expect(engine.levelOf('X')).toBe(1)
+  })
+
+  it('판단 제외 샘플이 끼면 대기 시간을 처음부터 다시 센다', () => {
+    const engine = new AlarmEngine()
+    engine.evaluate(0, 'X', '설비 X', vibration, 5)
+    engine.interrupt('X', 'vibration')
+    engine.evaluate(10, 'X', '설비 X', vibration, 5)
+    expect(engine.levelOf('X')).toBe(0)
+    engine.evaluate(13, 'X', '설비 X', vibration, 5)
+    expect(engine.levelOf('X')).toBe(1)
   })
 })

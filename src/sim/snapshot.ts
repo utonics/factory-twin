@@ -35,7 +35,6 @@ export interface AgvSnapshot {
   name: string
   status: AgvStatus
   cargo: CargoKind | null
-  cargoLineId: string | null
   battery: number
   speed: number
   odometer: number
@@ -93,7 +92,6 @@ export interface FactoryKpis {
 
 export interface FactorySnapshot {
   time: number
-  updatedAt: number
   stations: StationSnapshot[]
   agvs: AgvSnapshot[]
   lines: LineSnapshot[]
@@ -150,7 +148,6 @@ export function createSnapshot(sim: FactorySimulation): FactorySnapshot {
     name: a.name,
     status: a.status,
     cargo: a.cargo,
-    cargoLineId: a.cargoLineId,
     battery: a.battery,
     speed: a.speed,
     odometer: a.odometer,
@@ -182,7 +179,6 @@ export function createSnapshot(sim: FactorySimulation): FactorySnapshot {
   const { shipping } = state
   return {
     time,
-    updatedAt: Date.now(),
     stations,
     agvs,
     lines,

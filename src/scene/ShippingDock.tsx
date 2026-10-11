@@ -5,13 +5,15 @@ import type { DockSpec } from '../domain/types'
 import { simulation } from '../runtime'
 import { TRUCK_LENGTH } from '../sim/geometry'
 import { Selectable } from './Selectable'
+import { StaticInstances, type InstanceTransform } from './StaticInstances'
 import { COLORS } from './theme'
 
 const TRAILER = 9.6
 const CAB = TRUCK_LENGTH - TRAILER
+const WHEELS: InstanceTransform[] = [-3.6, -2.4, 2.6].flatMap((x) => [-1, 1].map((side) => ({ position: [x, 0.45, side * 1.1] as [number, number, number] })))
+const WHEEL_ROTATION: [number, number, number] = [Math.PI / 2, 0, 0]
 
 function TruckModel() {
-  const wheels = [-3.6, -2.4, 2.6]
   return (
     <group>
       {/* 트레일러: 후면(-x)이 도크를 향함 */}
@@ -42,14 +44,10 @@ function TruckModel() {
           <meshStandardMaterial color="#1b2740" roughness={0.2} />
         </mesh>
       </group>
-      {wheels.map((x) =>
-        [-1, 1].map((side) => (
-          <mesh key={`${x}:${side}`} position={[x, 0.45, side * 1.1]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-            <cylinderGeometry args={[0.45, 0.45, 0.35, 16]} />
-            <meshStandardMaterial color={COLORS.charcoal} />
-          </mesh>
-        )),
-      )}
+      <StaticInstances instances={WHEELS} rotation={WHEEL_ROTATION}>
+        <cylinderGeometry args={[0.45, 0.45, 0.35, 16]} />
+        <meshStandardMaterial color={COLORS.charcoal} />
+      </StaticInstances>
     </group>
   )
 }
@@ -60,14 +58,27 @@ function Dock({ dock, index }: { dock: DockSpec; index: number }) {
   const doorLight = useRef<MeshStandardMaterial>(null)
   const { dockX } = simulation.layout.shipping
 
+  const shown = useRef<boolean | null>(null)
+  const docked = useRef<boolean | null>(null)
+
   useFrame(() => {
     const t = simulation.state.shipping.trucks[index]
+    const visible = t.status !== 'away'
     if (truck.current) {
-      truck.current.visible = t.status !== 'away'
       truck.current.position.x = t.x
+      if (shown.current !== visible) {
+        shown.current = visible
+        truck.current.visible = visible
+        // 숨긴 객체도 레이캐스트에 걸리므로, 트럭이 없을 때는 클릭 판정에서 제외
+        truck.current.traverse((obj) => {
+          obj.raycast = visible ? Object.getPrototypeOf(obj).raycast : () => {}
+        })
+      }
     }
-    if (doorLight.current) {
-      const color = t.status === 'docked' ? COLORS.ok : COLORS.ng
+    const isDocked = t.status === 'docked'
+    if (doorLight.current && docked.current !== isDocked) {
+      docked.current = isDocked
+      const color = isDocked ? COLORS.ok : COLORS.ng
       doorLight.current.color.set(color)
       doorLight.current.emissive.set(color)
     }

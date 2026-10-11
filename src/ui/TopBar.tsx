@@ -37,7 +37,10 @@ export function TopBar() {
         </div>
         <label className="area-select">
           <span>구역</span>
-          <select value={area} onChange={(e) => setArea(e.target.value as AreaId)} aria-label="구역 선택(카메라 이동)">
+          <select value={area ?? ''} onChange={(e) => setArea(e.target.value as AreaId)} aria-label="구역 선택(카메라 이동)">
+            <option value="" disabled hidden>
+              직접 이동한 시점
+            </option>
             {AREAS.map((a) => (
               <option key={a.id} value={a.id}>
                 {a.label}

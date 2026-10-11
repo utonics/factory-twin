@@ -1,8 +1,9 @@
 import { Grid, Line } from '@react-three/drei'
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { BufferAttribute, BufferGeometry, DoubleSide } from 'three'
 import type { Vec2 } from '../domain/types'
 import { simulation } from '../runtime'
+import { StaticInstances, type InstanceTransform } from './StaticInstances'
 import { COLORS } from './theme'
 
 const LANE_WIDTH = 1.7
@@ -59,18 +60,31 @@ function rect(cx: number, cz: number, w: number, d: number): [number, number, nu
   ]
 }
 
-function Tree({ x, z, scale = 1 }: { x: number; z: number; scale?: number }) {
+/** 외곽 조경 나무 위치·크기 */
+const TREES: [number, number, number][] = [
+  [-30, 33, 1],
+  [-24, 35, 0.8],
+  [6, 33, 1.1],
+  [14, 34, 0.85],
+  [51, -18, 1],
+  [53, -10, 0.8],
+  [-52, -22, 0.9],
+]
+const TREE_TRUNKS: InstanceTransform[] = TREES.map(([x, z, s]) => ({ position: [x, 0.6 * s, z], scale: s }))
+const TREE_CROWNS: InstanceTransform[] = TREES.map(([x, z, s]) => ({ position: [x, 1.9 * s, z], scale: s }))
+
+function Trees() {
   return (
-    <group position={[x, 0, z]} scale={scale}>
-      <mesh position={[0, 0.6, 0]} castShadow>
+    <>
+      <StaticInstances instances={TREE_TRUNKS} castShadow>
         <cylinderGeometry args={[0.15, 0.2, 1.2, 6]} />
         <meshStandardMaterial color={COLORS.trunk} />
-      </mesh>
-      <mesh position={[0, 1.9, 0]} castShadow>
+      </StaticInstances>
+      <StaticInstances instances={TREE_CROWNS} castShadow>
         <icosahedronGeometry args={[1.1, 0]} />
         <meshStandardMaterial color={COLORS.tree} flatShading />
-      </mesh>
-    </group>
+      </StaticInstances>
+    </>
   )
 }
 
@@ -83,13 +97,14 @@ export function FactoryFloor() {
   const cz = (floor.minZ + floor.maxZ) / 2
 
   const lane = useMemo(() => ribbonGeometry(path.points, LANE_WIDTH), [path])
+  useEffect(() => () => lane.dispose(), [lane])
   const laneEdges = useMemo(() => [offsetPath(path.points, LANE_WIDTH / 2), offsetPath(path.points, -LANE_WIDTH / 2)], [path])
   const park = layout.agv.stops.find((s) => s.kind === 'park')!.point
 
   const pillars = useMemo(() => {
-    const list: [number, number][] = []
-    for (let x = floor.minX + 12; x < floor.maxX - 4; x += 16) list.push([x, floor.minZ + 0.6])
-    for (let z = floor.minZ + 12; z < floor.maxZ - 4; z += 14) list.push([floor.minX + 0.6, z])
+    const list: InstanceTransform[] = []
+    for (let x = floor.minX + 12; x < floor.maxX - 4; x += 16) list.push({ position: [x, 2.5, floor.minZ + 0.6] })
+    for (let z = floor.minZ + 12; z < floor.maxZ - 4; z += 14) list.push({ position: [floor.minX + 0.6, 2.5, z] })
     return list
   }, [floor])
 
@@ -150,12 +165,10 @@ export function FactoryFloor() {
         <boxGeometry args={[0.34, 0.1, depth]} />
         <meshStandardMaterial color={COLORS.primary} />
       </mesh>
-      {pillars.map(([x, z]) => (
-        <mesh key={`${x}:${z}`} position={[x, 2.5, z]} castShadow>
-          <boxGeometry args={[0.6, 5, 0.6]} />
-          <meshStandardMaterial color={COLORS.white} />
-        </mesh>
-      ))}
+      <StaticInstances instances={pillars} castShadow>
+        <boxGeometry args={[0.6, 5, 0.6]} />
+        <meshStandardMaterial color={COLORS.white} />
+      </StaticInstances>
 
       {/* 충전 스테이션 */}
       <group position={[park.x, 0, park.z + 2.4]}>
@@ -174,13 +187,7 @@ export function FactoryFloor() {
       </group>
 
       {/* 외곽 조경 */}
-      <Tree x={-30} z={33} />
-      <Tree x={-24} z={35} scale={0.8} />
-      <Tree x={6} z={33} scale={1.1} />
-      <Tree x={14} z={34} scale={0.85} />
-      <Tree x={51} z={-18} />
-      <Tree x={53} z={-10} scale={0.8} />
-      <Tree x={-52} z={-22} scale={0.9} />
+      <Trees />
     </group>
   )
 }

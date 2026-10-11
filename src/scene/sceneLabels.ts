@@ -3,7 +3,7 @@ import { factoryLayout } from '../data/factoryLayout'
 // 3D 위치에 붙는 DOM 라벨. DOM은 App 트리(SceneLabels)가 그리고,
 // 캔버스 안의 LabelProjector가 매 프레임 화면 좌표로 옮긴다.
 
-export interface ZoneLabel {
+interface ZoneLabel {
   id: string
   text: string
   position: [number, number, number]

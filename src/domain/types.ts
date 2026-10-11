@@ -185,6 +185,8 @@ export interface AgvState {
   taskRemaining: number
   taskDuration: number
   battery: number
+  /** 충전 중 이 수준(%)에 도달하기 전에는 출발하지 않음 */
+  chargeUntil: number
   odometer: number
   deliveries: number
 }

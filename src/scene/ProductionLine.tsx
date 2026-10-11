@@ -8,6 +8,7 @@ import { useFactoryStore } from '../store/useFactoryStore'
 import { Dimmable } from './Dimmable'
 import { BELT_Y, COLORS, sceneDelta } from './theme'
 import { Selectable } from './Selectable'
+import { StaticInstances, type InstanceTransform } from './StaticInstances'
 import { CncMachine } from './stations/CncMachine'
 import { InspectionStation } from './stations/InspectionStation'
 import { PackagingMachine } from './stations/PackagingMachine'
@@ -61,11 +62,14 @@ function Conveyor({ line }: { line: LineSpec }) {
     texture.offset.x -= (sceneDelta(delta) * line.conveyorSpeed) / BELT_TILE
   })
 
+  // 다리는 수가 많고 모양이 같아 인스턴싱(그림자는 가늘어 생략)
   const legs = useMemo(() => {
-    const xs: number[] = []
-    for (let x = line.xStart + 0.4; x < line.xEnd; x += 1.6) xs.push(x)
-    return xs
-  }, [line.xStart, line.xEnd])
+    const list: InstanceTransform[] = []
+    for (let x = line.xStart + 0.4; x < line.xEnd; x += 1.6) {
+      for (const side of [-1, 1]) list.push({ position: [x - centerX, (BELT_Y - 0.08) / 2, side * 0.45] })
+    }
+    return list
+  }, [line.xStart, line.xEnd, centerX])
 
   return (
     <group position={[centerX, 0, 0]}>
@@ -83,14 +87,10 @@ function Conveyor({ line }: { line: LineSpec }) {
           <meshStandardMaterial color={COLORS.steel} metalness={0.4} roughness={0.5} />
         </mesh>
       ))}
-      {legs.map((x) =>
-        [-1, 1].map((side) => (
-          <mesh key={`${x}:${side}`} position={[x - centerX, (BELT_Y - 0.08) / 2, side * 0.45]} castShadow>
-            <boxGeometry args={[0.08, BELT_Y - 0.08, 0.08]} />
-            <meshStandardMaterial color={COLORS.steelDark} />
-          </mesh>
-        )),
-      )}
+      <StaticInstances instances={legs}>
+        <boxGeometry args={[0.08, BELT_Y - 0.08, 0.08]} />
+        <meshStandardMaterial color={COLORS.steelDark} />
+      </StaticInstances>
     </group>
   )
 }

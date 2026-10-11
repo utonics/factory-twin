@@ -68,37 +68,26 @@ function AlarmRow({ alarm }: { alarm: AlarmRecord }) {
   const acknowledge = useFactoryStore((s) => s.acknowledgeAlarm)
   const active = alarm.clearedAt === null
   const color = alarm.level === 'crit' ? STATUS.crit : STATUS.warn
-  const valueText = alarm.value === null ? '' : ` ${alarm.value.toFixed(alarm.unit === 'mm/s' || alarm.unit === 'bar' ? 2 : 1)}${alarm.unit}`
+  const valueText = active && alarm.value !== null ? ` ${alarm.value.toFixed(alarm.digits)}${alarm.unit}` : ''
   return (
-    <div
-      className={`row alarm ${active ? '' : 'is-cleared'}`}
-      role="button"
-      tabIndex={0}
-      onClick={() => select(alarm.assetId)}
-      onKeyDown={(e) => e.key === 'Enter' && select(alarm.assetId)}
-    >
-      <span className="alarm-level" style={{ color: active ? color : undefined }}>
-        {alarm.level === 'crit' ? '◆ 위험' : '▲ 경고'}
-      </span>
-      <span className="row-id">
-        <b>
-          {alarm.assetName} · {alarm.label}
-          {active ? valueText : ''}
-        </b>
-        <small>
-          발생 {formatClock(alarm.raisedAt)}
-          {alarm.clearedAt !== null ? ` · 해제 ${formatClock(alarm.clearedAt)}` : ''}
-        </small>
-      </span>
+    <div className={`row alarm ${active ? '' : 'is-cleared'}`}>
+      <button type="button" className="row-main" onClick={() => select(alarm.assetId)}>
+        <span className="alarm-level" style={{ color: active ? color : undefined }}>
+          {alarm.level === 'crit' ? '◆ 위험' : '▲ 경고'}
+        </span>
+        <span className="row-id">
+          <b>
+            {alarm.assetName} · {alarm.label}
+            {valueText}
+          </b>
+          <small>
+            발생 {formatClock(alarm.raisedAt)}
+            {alarm.clearedAt !== null ? ` · 해제 ${formatClock(alarm.clearedAt)}` : ''}
+          </small>
+        </span>
+      </button>
       {active && !alarm.acknowledged ? (
-        <button
-          type="button"
-          className="ack-btn"
-          onClick={(e) => {
-            e.stopPropagation()
-            acknowledge(alarm.id)
-          }}
-        >
+        <button type="button" className="ack-btn" onClick={() => acknowledge(alarm.id)}>
           확인
         </button>
       ) : (

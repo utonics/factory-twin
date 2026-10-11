@@ -393,11 +393,16 @@ button {
 }
 .steps li {
   position: relative;
+  width: 96px;
+}
+.steps li > button {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 96px;
-  cursor: pointer;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
   text-align: center;
 }
 .steps li::before {
@@ -710,8 +715,18 @@ button {
   color: #e5484d;
 }
 .row.alarm {
-  grid-template-columns: 58px 1fr auto;
-  cursor: pointer;
+  grid-template-columns: 1fr auto;
+}
+.row-main {
+  display: grid;
+  grid-template-columns: 58px 1fr;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
 }
 .row.alarm.is-cleared {
   opacity: 0.55;

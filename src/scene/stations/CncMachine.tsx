@@ -18,6 +18,7 @@ export function CncMachine({ spec }: { spec: StationSpec }) {
   const spindle = useRef<Group>(null)
   const chuck = useRef<Mesh>(null)
   const glow = useRef<MeshStandardMaterial>(null)
+  const glowDown = useRef<boolean | null>(null)
 
   useFrame((_, delta) => {
     const st = simulation.state.stations[spec.id]
@@ -34,7 +35,11 @@ export function CncMachine({ spec }: { spec: StationSpec }) {
     if (glow.current) {
       const target = st.status === 'down' ? 0.2 : running ? 1.4 : 0.35
       glow.current.emissiveIntensity += (target - glow.current.emissiveIntensity) * Math.min(1, delta * 4)
-      glow.current.emissive.set(st.status === 'down' ? COLORS.ng : '#7fb0ff')
+      const down = st.status === 'down'
+      if (glowDown.current !== down) {
+        glowDown.current = down
+        glow.current.emissive.set(down ? COLORS.ng : '#7fb0ff')
+      }
     }
   })
 

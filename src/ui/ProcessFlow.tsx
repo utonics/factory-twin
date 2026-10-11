@@ -27,30 +27,36 @@ export function ProcessFlow() {
           </div>
         </div>
         <ol className="steps">
-          <li onClick={() => select(line.id)}>
-            <span className="step-dot" style={{ background: inputColor }} />
-            <b>자재 투입</b>
-            <small>대기 {line.inputUnits}개</small>
+          <li>
+            <button type="button" onClick={() => select(line.id)}>
+              <span className="step-dot" style={{ background: inputColor }} />
+              <b>자재 투입</b>
+              <small>대기 {line.inputUnits}개</small>
+            </button>
           </li>
           {steps.map((s) => (
-            <li key={s.id} onClick={() => select(s.id)} title={STATION_STATUS_LABEL[s.status]}>
-              <span className={`step-dot ${s.status === 'down' ? 'blink' : ''}`} style={{ background: STATION_STATUS_COLOR[s.status] }}>
-                {s.status === 'processing' && (
-                  <svg viewBox="0 0 36 36" className="step-ring">
-                    <circle cx="18" cy="18" r="16" pathLength={100} strokeDasharray={`${s.progress * 100} 100`} />
-                  </svg>
-                )}
-              </span>
-              <b>{s.name}</b>
-              <small>{STATION_STATUS_LABEL[s.status]}</small>
+            <li key={s.id}>
+              <button type="button" onClick={() => select(s.id)} title={STATION_STATUS_LABEL[s.status]}>
+                <span className={`step-dot ${s.status === 'down' ? 'blink' : ''}`} style={{ background: STATION_STATUS_COLOR[s.status] }}>
+                  {s.status === 'processing' && (
+                    <svg viewBox="0 0 36 36" className="step-ring">
+                      <circle cx="18" cy="18" r="16" pathLength={100} strokeDasharray={`${s.progress * 100} 100`} />
+                    </svg>
+                  )}
+                </span>
+                <b>{s.name}</b>
+                <small>{STATION_STATUS_LABEL[s.status]}</small>
+              </button>
             </li>
           ))}
-          <li onClick={() => select(line.id)}>
-            <span className="step-dot" style={{ background: '#2f5bea' }} />
-            <b>팔레트 적재</b>
-            <small>
-              {line.palletFill}/{line.palletSize} · 대기 {line.readyPallets}
-            </small>
+          <li>
+            <button type="button" onClick={() => select(line.id)}>
+              <span className="step-dot" style={{ background: '#2f5bea' }} />
+              <b>팔레트 적재</b>
+              <small>
+                {line.palletFill}/{line.palletSize} · 대기 {line.readyPallets}
+              </small>
+            </button>
           </li>
         </ol>
       </div>

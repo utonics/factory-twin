@@ -1,8 +1,9 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
-import { Vector3, type Group, type Mesh, type PointLight } from 'three'
+import { Vector3, type Group, type Mesh } from 'three'
 import type { StationSpec } from '../../domain/types'
 import { simulation } from '../../runtime'
+import { StaticInstances, type InstanceTransform } from '../StaticInstances'
 import { BELT_Y, COLORS, smoothstep } from '../theme'
 
 const SHOULDER_HEIGHT = 1.35
@@ -28,7 +29,6 @@ function RobotArm({ stationId, base, rest, phase, color }: ArmProps) {
   const elbow = useRef<Group>(null)
   const wrist = useRef<Group>(null)
   const spark = useRef<Mesh>(null)
-  const light = useRef<PointLight>(null)
   const tip = useMemo(() => new Vector3(...rest), [rest])
   const goal = useMemo(() => new Vector3(), [])
 
@@ -66,7 +66,6 @@ function RobotArm({ stationId, base, rest, phase, color }: ArmProps) {
       spark.current.visible = welding
       spark.current.scale.setScalar(0.6 + flicker * 0.8)
     }
-    if (light.current) light.current.intensity = welding ? 2 + flicker * 4 : 0
   })
 
   return (
@@ -107,7 +106,6 @@ function RobotArm({ stationId, base, rest, phase, color }: ArmProps) {
                 <sphereGeometry args={[0.09, 10, 10]} />
                 <meshBasicMaterial color="#fff3b0" toneMapped={false} />
               </mesh>
-              <pointLight ref={light} position={[TOOL + 0.1, 0, 0]} color="#9fd0ff" intensity={0} distance={4} decay={2} />
             </group>
           </group>
         </group>
@@ -116,13 +114,13 @@ function RobotArm({ stationId, base, rest, phase, color }: ArmProps) {
   )
 }
 
-const FENCE_POSTS: [number, number][] = [
+const FENCE_POSTS: InstanceTransform[] = [
   [-2.1, -2.9],
   [0, -2.9],
   [2.1, -2.9],
   [-2.1, -1.1],
   [2.1, -1.1],
-]
+].map(([x, z]) => ({ position: [x, 0.9, z] as [number, number, number] }))
 
 export function RobotCell({ spec }: { spec: StationSpec }) {
   return (
@@ -134,7 +132,7 @@ export function RobotCell({ spec }: { spec: StationSpec }) {
       </mesh>
       {/* 클램프 */}
       {[-0.55, 0.55].map((z) => (
-        <mesh key={z} position={[0, BELT_Y + 0.12, z]} castShadow>
+        <mesh key={z} position={[0, BELT_Y + 0.12, z]}>
           <boxGeometry args={[0.5, 0.24, 0.1]} />
           <meshStandardMaterial color={COLORS.accent} />
         </mesh>
@@ -142,12 +140,10 @@ export function RobotCell({ spec }: { spec: StationSpec }) {
       <RobotArm stationId={spec.id} base={[-0.4, -1.75]} rest={[-0.9, 2.6, -1.0]} phase={0} color={COLORS.accent} />
       <RobotArm stationId={spec.id} base={[0.5, 1.75]} rest={[1.0, 2.5, 1.0]} phase={0.35} color={COLORS.accent} />
       {/* 후면 안전 펜스 */}
-      {FENCE_POSTS.map(([x, z]) => (
-        <mesh key={`${x}:${z}`} position={[x, 0.9, z]} castShadow>
-          <boxGeometry args={[0.08, 1.8, 0.08]} />
-          <meshStandardMaterial color={COLORS.accent} />
-        </mesh>
-      ))}
+      <StaticInstances instances={FENCE_POSTS}>
+        <boxGeometry args={[0.08, 1.8, 0.08]} />
+        <meshStandardMaterial color={COLORS.accent} />
+      </StaticInstances>
       <mesh position={[0, 0.95, -2.9]}>
         <boxGeometry args={[4.2, 1.5, 0.03]} />
         <meshStandardMaterial color={COLORS.steel} transparent opacity={0.35} />

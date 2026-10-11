@@ -27,10 +27,8 @@ type Handler = (message: PlantMessage) => void
 /** 프로세스 내부 발행/구독 버스. 실서비스에서는 MQTT·WebSocket 클라이언트로 바꾸면 된다. */
 export class MessageBus {
   private readonly handlers = new Set<Handler>()
-  published = 0
 
   publish(message: PlantMessage): void {
-    this.published++
     for (const handler of this.handlers) handler(message)
   }
 

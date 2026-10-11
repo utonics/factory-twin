@@ -23,7 +23,6 @@ interface AssetInfo {
   id: string
   name: string
   kind: AssetKind
-  lineId: string | null
   sensors: SensorSpec[]
 }
 
@@ -60,7 +59,6 @@ export interface StationAnalytics {
   health: number | null
   /** 위험 임계치 도달 예상(초). 악화 추세가 아니면 null */
   etaSeconds: number | null
-  latest: Record<string, number>
 }
 
 export interface LineAnalytics extends OeeBreakdown {
@@ -76,7 +74,6 @@ export interface OrderView {
   customer: string
   pallets: number
   shipped: number
-  createdAt: number
   dueAt: number
   completedAt: number | null
   /** 납기를 넘겼는지(완료 오더는 완료 시각 기준, 미완료는 현재 기준) */
@@ -88,7 +85,6 @@ export interface OrderAnalytics {
   open: number
   overdueOpen: number
   completed: number
-  completedOnTime: number
   /** 납기 준수율(완료 오더 기준). 완료 오더가 없으면 null */
   onTimeRate: number | null
 }
@@ -109,7 +105,6 @@ export interface SeriesData {
 
 export interface AnalyticsSnapshot {
   time: number
-  messageCount: number
   messagesPerMinute: number
   alarms: AlarmRecord[]
   activeAlarmCount: { warn: number; crit: number; unacknowledged: number }
@@ -158,7 +153,6 @@ export class DataProcessor {
   private readonly assets = new Map<string, AssetInfo>()
   private readonly series = new Map<string, RingBuffer>()
   private readonly trends = new Map<string, RingBuffer>()
-  private readonly latest = new Map<string, Record<string, number>>()
   private readonly stationAccounts = new Map<string, StationAccount>()
   private readonly lineAccounts = new Map<string, LineAccount>()
   private readonly rate: { second: number; count: number }[] = []
@@ -166,7 +160,6 @@ export class DataProcessor {
   private readonly docks = new Map<string, TruckStatus>()
   private startTs: number | null = null
   private now = 0
-  private messageCount = 0
 
   constructor(private readonly layout: FactoryLayout, bus: MessageBus) {
     for (const line of layout.lines) {
@@ -181,16 +174,16 @@ export class DataProcessor {
         leadTimes: [],
       })
       for (const spec of line.stations) {
-        this.assets.set(spec.id, { id: spec.id, name: `${line.name} ${spec.name}`, kind: spec.kind, lineId: line.id, sensors: SENSOR_CATALOG[spec.kind] })
+        this.assets.set(spec.id, { id: spec.id, name: `${line.name} ${spec.name}`, kind: spec.kind, sensors: SENSOR_CATALOG[spec.kind] })
         this.stationAccounts.set(spec.id, { state: 'idle', since: 0, downTime: 0, total: 0, ng: 0, idealTime: 0 })
       }
     }
     for (const agv of layout.agv.fleet) {
-      this.assets.set(agv.id, { id: agv.id, name: agv.name, kind: 'agv', lineId: null, sensors: SENSOR_CATALOG.agv })
+      this.assets.set(agv.id, { id: agv.id, name: agv.name, kind: 'agv', sensors: SENSOR_CATALOG.agv })
     }
-    this.assets.set('WH', { id: 'WH', name: '자재창고', kind: 'warehouse', lineId: null, sensors: SENSOR_CATALOG.warehouse })
+    this.assets.set('WH', { id: 'WH', name: '자재창고', kind: 'warehouse', sensors: SENSOR_CATALOG.warehouse })
     for (const line of layout.lines) {
-      this.assets.set(line.id, { id: line.id, name: line.name, kind: 'line', lineId: line.id, sensors: SENSOR_CATALOG.line })
+      this.assets.set(line.id, { id: line.id, name: line.name, kind: 'line', sensors: SENSOR_CATALOG.line })
     }
     for (const dock of layout.shipping.docks) this.docks.set(dock.id, 'away')
     bus.subscribe((message) => this.handle(message))
@@ -202,7 +195,6 @@ export class DataProcessor {
       for (const account of this.stationAccounts.values()) account.since = message.ts
     }
     this.now = Math.max(this.now, message.ts)
-    this.messageCount++
     this.countRate(message.ts)
     if (message.kind === 'telemetry') this.onTelemetry(message)
     else this.onEvent(message.event)
@@ -239,13 +231,17 @@ export class DataProcessor {
   private onTelemetry(m: TelemetryMessage): void {
     const asset = this.assets.get(m.assetId)
     if (!asset) return
-    this.latest.set(m.assetId, m.values)
+    const isStation = this.stationAccounts.has(m.assetId)
     for (const spec of asset.sensors) {
       const value = m.values[spec.tag]
       if (value === undefined) continue
       this.buffer(this.series, `${m.assetId}:${spec.tag}`, SERIES_SECONDS).push(m.ts, value)
-      if (spec.whileRunning && !m.running) continue
-      if (spec.health) this.buffer(this.trends, m.assetId, TREND_WINDOW).push(m.ts, value)
+      if (spec.whileRunning && !m.running) {
+        this.alarms.interrupt(m.assetId, spec.tag)
+        continue
+      }
+      // 예지 보전 추세는 설비만 계산
+      if (spec.health && isStation) this.buffer(this.trends, m.assetId, TREND_WINDOW).push(m.ts, value)
       this.alarms.evaluate(m.ts, m.assetId, asset.name, spec, value)
     }
   }
@@ -295,7 +291,6 @@ export class DataProcessor {
           customer: event.customer,
           pallets: event.pallets,
           shipped: 0,
-          createdAt: event.ts,
           dueAt: event.dueAt,
           completedAt: null,
           late: false,
@@ -402,7 +397,6 @@ export class DataProcessor {
       open: open.length,
       overdueOpen: open.filter((o) => o.late).length,
       completed: this.completedCount,
-      completedOnTime: this.completedOnTime,
       onTimeRate: this.completedCount > 0 ? this.completedOnTime / this.completedCount : null,
     }
   }
@@ -433,7 +427,7 @@ export class DataProcessor {
     const stations: Record<string, StationAnalytics> = {}
     for (const id of this.stationAccounts.keys()) {
       const asset = this.assets.get(id)!
-      stations[id] = { oee: this.stationOee(id), ...this.prediction(asset), latest: this.latest.get(id) ?? {} }
+      stations[id] = { oee: this.stationOee(id), ...this.prediction(asset) }
     }
 
     const records = this.alarms.records()
@@ -446,7 +440,6 @@ export class DataProcessor {
     const selected = selectedId ? this.assets.get(selectedId) : undefined
     return {
       time: this.now,
-      messageCount: this.messageCount,
       messagesPerMinute: this.rate.reduce((s, r) => s + r.count, 0) * (60 / RATE_WINDOW),
       alarms: ordered.map((a) => ({ ...a })),
       activeAlarmCount: {
