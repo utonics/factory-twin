@@ -12,6 +12,8 @@ const HOME_TARGET = HOME.target
 const MIN_DISTANCE = 12
 const MAX_DISTANCE = 140
 const MARGIN = 6
+/** 조작 중 카메라가 이만큼(m) 넘게 움직여야 '직접 이동한 시점'으로 본다 */
+const USER_MOVE_THRESHOLD = 0.5
 
 type Controls = ComponentRef<typeof MapControls>
 
@@ -24,6 +26,8 @@ export function CameraRig() {
   const camera = useThree((s) => s.camera)
   const command = useFactoryStore((s) => s.cameraCommand)
   const flight = useRef<{ position: Vector3; target: Vector3 } | null>(null)
+  /** 사용자 조작이 시작된 시점의 카메라 상태(실제로 움직였는지 판단용) */
+  const interaction = useRef<{ position: Vector3; target: Vector3 } | null>(null)
 
   useEffect(() => {
     const c = controls.current
@@ -76,11 +80,26 @@ export function CameraRig() {
       enableDamping
       dampingFactor={0.12}
       screenSpacePanning={false}
-      onChange={clampTarget}
+      onChange={() => {
+        clampTarget()
+        // 조작 중 카메라가 실제로 움직였을 때만 구역 선택 해제(같은 구역을 다시 고를 수 있게).
+        // 입력 시작(start)만으로는 해제하지 않아, 움직임 없는 start 이벤트에 선택이 풀리지 않는다
+        const c = controls.current
+        const start = interaction.current
+        if (!c || !start) return
+        if (camera.position.distanceTo(start.position) > USER_MOVE_THRESHOLD || c.target.distanceTo(start.target) > USER_MOVE_THRESHOLD) {
+          interaction.current = null
+          useFactoryStore.getState().clearArea()
+        }
+      }}
       onStart={() => {
-        // 사용자가 직접 움직이면 진행 중인 이동을 멈추고 구역 선택을 해제(같은 구역을 다시 고를 수 있게)
+        // 사용자가 조작을 시작하면 진행 중인 구역 이동을 멈춘다
         flight.current = null
-        useFactoryStore.getState().clearArea()
+        const c = controls.current
+        if (c) interaction.current = { position: camera.position.clone(), target: c.target.clone() }
+      }}
+      onEnd={() => {
+        interaction.current = null
       }}
     />
   )
