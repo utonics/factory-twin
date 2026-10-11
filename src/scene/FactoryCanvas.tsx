@@ -11,6 +11,7 @@ import { LabelProjector } from './LabelProjector'
 import { ProductionLine } from './ProductionLine'
 import { Products } from './Products'
 import { SelectionMarker } from './SelectionMarker'
+import { ShaderWarmup } from './ShaderWarmup'
 import { ShippingDock } from './ShippingDock'
 import { COLORS } from './theme'
 import { Warehouse } from './Warehouse'
@@ -89,6 +90,7 @@ export function FactoryCanvas() {
       <AlarmBeacons />
       <SelectionMarker />
       <LabelProjector />
+      <ShaderWarmup />
     </Canvas>
   )
 }

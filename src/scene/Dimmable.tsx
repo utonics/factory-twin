@@ -1,8 +1,11 @@
 import { useFrame } from '@react-three/fiber'
-import { useRef, type ReactNode } from 'react'
+import { useEffect, useRef, type ReactNode } from 'react'
 import type { Group, Material, Mesh } from 'three'
 
 const DIM_OPACITY = 0.15
+
+/** 흐림 대상 그룹 목록(셰이더 미리 컴파일용) */
+export const dimmableRoots = new Set<Group>()
 
 interface Saved {
   opacity: number
@@ -44,6 +47,15 @@ function setDimmed(root: Group, dimmed: boolean): void {
 export function Dimmable({ isDimmed, children }: { isDimmed: () => boolean; children: ReactNode }) {
   const group = useRef<Group>(null)
   const current = useRef(false)
+
+  useEffect(() => {
+    const root = group.current
+    if (!root) return
+    dimmableRoots.add(root)
+    return () => {
+      dimmableRoots.delete(root)
+    }
+  }, [])
 
   useFrame(() => {
     const next = isDimmed()
