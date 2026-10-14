@@ -1,0 +1,10 @@
+{
+  "name": "factory-twin-training",
+  "private": true,
+  "description": "컴퓨터메이트 개발자 교육 자료 빌드 도구(다이어그램 PNG, 워크북 DOCX)",
+  "type": "module",
+  "devDependencies": {
+    "docx": "^9.11.0",
+    "sharp": "^0.35.5"
+  }
+}

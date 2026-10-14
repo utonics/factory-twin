@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1664" height="640" viewBox="0 0 1664 640" font-family="Freesentation" font-size="26">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#17253F"/>
+    </marker>
+    <marker id="arrowAcc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#F0A429"/>
+    </marker>
+  </defs>
+  <rect width="1664" height="640" fill="#F7F6F1"/>
+
+  <!-- 1행: 왼쪽 → 오른쪽 -->
+  <rect x="100" y="40" width="320" height="170" rx="16" fill="#FBEBCF" stroke="#F0A429" stroke-width="4"/>
+  <text x="260" y="92" text-anchor="middle" font-size="24" font-weight="700" fill="#955A08">① 사람</text>
+  <text x="260" y="138" text-anchor="middle" font-size="34" font-weight="700" fill="#17253F">프롬프트</text>
+  <text x="260" y="180" text-anchor="middle" fill="#3D4757">방향 + 이번 범위</text>
+  <line x1="424" y1="125" x2="476" y2="125" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="482" y="40" width="320" height="170" rx="16" fill="#17253F"/>
+  <text x="642" y="92" text-anchor="middle" font-size="24" font-weight="700" fill="#F0A429">② Claude Code ↔ 사람</text>
+  <text x="642" y="138" text-anchor="middle" font-size="34" font-weight="700" fill="#F7F6F1">질문 · 결정</text>
+  <text x="642" y="180" text-anchor="middle" fill="#BFC8D6">해석이 갈릴 때만</text>
+  <line x1="806" y1="125" x2="858" y2="125" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="864" y="40" width="320" height="170" rx="16" fill="#17253F"/>
+  <text x="1024" y="92" text-anchor="middle" font-size="24" font-weight="700" fill="#F0A429">③ Claude Code</text>
+  <text x="1024" y="138" text-anchor="middle" font-size="34" font-weight="700" fill="#F7F6F1">구현</text>
+  <text x="1024" y="180" text-anchor="middle" fill="#BFC8D6">설계 제안 · 코드</text>
+  <line x1="1188" y1="125" x2="1240" y2="125" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="1246" y="40" width="320" height="170" rx="16" fill="#17253F"/>
+  <text x="1406" y="92" text-anchor="middle" font-size="24" font-weight="700" fill="#F0A429">④ Claude Code</text>
+  <text x="1406" y="138" text-anchor="middle" font-size="34" font-weight="700" fill="#F7F6F1">자체 검증</text>
+  <text x="1406" y="180" text-anchor="middle" fill="#BFC8D6">테스트 · 수치 · 브라우저</text>
+
+  <!-- 4 → 5 -->
+  <line x1="1406" y1="214" x2="1406" y2="296" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+  <text x="1386" y="262" text-anchor="end" font-size="24" fill="#6B7280">문제를 찾으면 스스로 고치고 다시 검증</text>
+
+  <!-- 2행: 오른쪽 → 왼쪽 -->
+  <rect x="1246" y="302" width="320" height="170" rx="16" fill="#17253F"/>
+  <text x="1406" y="354" text-anchor="middle" font-size="24" font-weight="700" fill="#F0A429">⑤ Claude Code</text>
+  <text x="1406" y="400" text-anchor="middle" font-size="34" font-weight="700" fill="#F7F6F1">보고</text>
+  <text x="1406" y="442" text-anchor="middle" fill="#BFC8D6">미검증 · 남긴 것 포함</text>
+  <line x1="1242" y1="387" x2="1190" y2="387" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="864" y="302" width="320" height="170" rx="16" fill="#FBEBCF" stroke="#F0A429" stroke-width="4"/>
+  <text x="1024" y="354" text-anchor="middle" font-size="24" font-weight="700" fill="#955A08">⑥ 사람</text>
+  <text x="1024" y="400" text-anchor="middle" font-size="34" font-weight="700" fill="#17253F">확인</text>
+  <text x="1024" y="442" text-anchor="middle" fill="#3D4757">결과 보고 판단</text>
+  <line x1="860" y1="387" x2="808" y2="387" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="482" y="302" width="320" height="170" rx="16" fill="#17253F"/>
+  <text x="642" y="354" text-anchor="middle" font-size="24" font-weight="700" fill="#F0A429">⑦ Claude Code</text>
+  <text x="642" y="400" text-anchor="middle" font-size="34" font-weight="700" fill="#F7F6F1">커밋 · 푸시</text>
+  <text x="642" y="442" text-anchor="middle" fill="#BFC8D6">사람이 요청할 때만</text>
+  <line x1="478" y1="387" x2="426" y2="387" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <rect x="100" y="302" width="320" height="170" rx="16" fill="#17253F"/>
+  <text x="260" y="354" text-anchor="middle" font-size="24" font-weight="700" fill="#F0A429">⑧ Claude Code</text>
+  <text x="260" y="400" text-anchor="middle" font-size="34" font-weight="700" fill="#F7F6F1">배포 · 운영 확인</text>
+  <text x="260" y="442" text-anchor="middle" fill="#BFC8D6">운영 주소 재검증</text>
+
+  <!-- 8 → 1 되돌아가기 -->
+  <path d="M96,387 L56,387 L56,125 L92,125" fill="none" stroke="#F0A429" stroke-width="4" marker-end="url(#arrowAcc)"/>
+  <text x="34" y="256" font-size="24" font-weight="700" fill="#955A08" transform="rotate(-90 34 256)" text-anchor="middle">다음 프롬프트</text>
+
+  <!-- 범례 -->
+  <rect x="100" y="540" width="36" height="36" rx="6" fill="#FBEBCF" stroke="#F0A429" stroke-width="3"/>
+  <text x="150" y="568" fill="#3D4757">사람: 방향 · 결정 · 승인</text>
+  <rect x="480" y="540" width="36" height="36" rx="6" fill="#17253F"/>
+  <text x="530" y="568" fill="#3D4757">Claude Code: 설계 제안 · 구현 · 검증 · 보고</text>
+  <text x="1566" y="568" text-anchor="end" font-weight="700" fill="#17253F">이번 프로젝트: 6바퀴 = 커밋 6개</text>
+</svg>

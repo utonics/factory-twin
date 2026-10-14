@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1664" height="600" viewBox="0 0 1664 600" font-family="Freesentation" font-size="26">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#17253F"/>
+    </marker>
+  </defs>
+  <rect width="1664" height="600" fill="#F7F6F1"/>
+
+  <!-- 자재창고 -->
+  <rect x="20" y="130" width="210" height="170" rx="16" fill="#17253F"/>
+  <text x="125" y="205" text-anchor="middle" font-weight="700" font-size="32" fill="#F7F6F1">자재창고</text>
+  <text x="125" y="245" text-anchor="middle" fill="#BFC8D6">원자재 랙</text>
+  <text x="125" y="278" text-anchor="middle" fill="#BFC8D6">정기·긴급 입고</text>
+
+  <!-- AGV 원자재 -->
+  <line x1="236" y1="215" x2="340" y2="215" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+  <text x="288" y="195" text-anchor="middle" font-weight="700" fill="#17253F">AGV</text>
+  <text x="288" y="252" text-anchor="middle" font-size="24" fill="#6B7280">원자재</text>
+
+  <!-- 생산라인 -->
+  <rect x="348" y="70" width="928" height="290" rx="18" fill="#FEFEFB" stroke="#17253F" stroke-width="3"/>
+  <text x="812" y="112" text-anchor="middle" font-weight="700" font-size="30" fill="#17253F">생산라인 × 2 (1라인·2라인 같은 구성)</text>
+  <g font-size="26">
+    <rect x="368" y="140" width="200" height="130" rx="12" fill="#EDF0F5"/>
+    <text x="468" y="195" text-anchor="middle" font-weight="700" fill="#1B2431">CNC 가공</text>
+    <text x="468" y="235" text-anchor="middle" font-size="24" fill="#3D4757">6.5초</text>
+    <line x1="572" y1="205" x2="592" y2="205" stroke="#17253F" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="596" y="140" width="200" height="130" rx="12" fill="#FBEBCF" stroke="#F0A429" stroke-width="3"/>
+    <text x="696" y="195" text-anchor="middle" font-weight="700" fill="#1B2431">용접 로봇 셀</text>
+    <text x="696" y="235" text-anchor="middle" font-size="24" fill="#3D4757">7초 · 병목</text>
+    <line x1="800" y1="205" x2="820" y2="205" stroke="#17253F" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="824" y="140" width="200" height="130" rx="12" fill="#EDF0F5"/>
+    <text x="924" y="195" text-anchor="middle" font-weight="700" fill="#1B2431">비전 검사</text>
+    <text x="924" y="235" text-anchor="middle" font-size="24" fill="#3D4757">불량 4% 배출</text>
+    <line x1="1028" y1="205" x2="1048" y2="205" stroke="#17253F" stroke-width="3" marker-end="url(#arrow)"/>
+    <rect x="1052" y="140" width="200" height="130" rx="12" fill="#EDF0F5"/>
+    <text x="1152" y="195" text-anchor="middle" font-weight="700" fill="#1B2431">자동 포장</text>
+    <text x="1152" y="235" text-anchor="middle" font-size="24" fill="#3D4757">8개씩 팔레트로</text>
+  </g>
+  <text x="812" y="320" text-anchor="middle" font-size="26" fill="#3D4757">누적 컨베이어 · 고장과 수리 · 마모가 쌓이면 센서 값이 먼저 나빠짐</text>
+
+  <!-- AGV 완제품 -->
+  <line x1="1282" y1="215" x2="1390" y2="215" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+  <text x="1336" y="195" text-anchor="middle" font-weight="700" fill="#17253F">AGV</text>
+  <text x="1336" y="252" text-anchor="middle" font-size="24" fill="#6B7280">완제품</text>
+
+  <!-- 출하 -->
+  <rect x="1398" y="130" width="246" height="170" rx="16" fill="#17253F"/>
+  <text x="1521" y="205" text-anchor="middle" font-weight="700" font-size="32" fill="#F7F6F1">출하 도크</text>
+  <text x="1521" y="245" text-anchor="middle" fill="#BFC8D6">팔레트 6개 상차</text>
+  <text x="1521" y="278" text-anchor="middle" fill="#BFC8D6">도크 2개 · 트럭 교대</text>
+
+  <!-- 물류 바탕 -->
+  <rect x="20" y="410" width="1050" height="150" rx="16" fill="#EDF0F5"/>
+  <text x="50" y="470" font-weight="700" font-size="30" fill="#17253F">AGV 5대 · 단방향 순환로</text>
+  <text x="50" y="515" font-size="26" fill="#3D4757">빈 AGV가 정류장에 다가가면 운반을 예약 · 앞차와 안전거리 유지</text>
+  <rect x="1094" y="410" width="550" height="150" rx="16" fill="#FBEBCF" stroke="#F0A429" stroke-width="3"/>
+  <text x="1124" y="470" font-weight="700" font-size="30" fill="#17253F">충전 베이 3칸</text>
+  <text x="1124" y="515" font-size="26" fill="#3D4757">순환로 밖 분기선 · 안전할 때만 합류</text>
+</svg>

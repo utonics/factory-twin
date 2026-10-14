@@ -1,0 +1,98 @@
+{
+  "v": 4,
+  "createdOnFiles": {
+    "v": 1,
+    "at": "2026-10-14T12:25:42Z"
+  },
+  "lists": "css",
+  "title": "Claude Code로 하는 바이브 코딩 — 컴퓨터메이트 개발자 교육",
+  "cover": "cover",
+  "order": [
+    "cover",
+    "result",
+    "journey",
+    "takeaways",
+    "div1",
+    "definition",
+    "loop",
+    "roles",
+    "stages",
+    "setup",
+    "features",
+    "phrases",
+    "div2",
+    "pattern",
+    "template5",
+    "p01",
+    "translate",
+    "p02",
+    "split",
+    "flow",
+    "p03",
+    "div3",
+    "journey-a",
+    "journey-b",
+    "p06",
+    "tuning",
+    "checkpoint",
+    "p08",
+    "p10",
+    "p12",
+    "p18",
+    "div4",
+    "principles",
+    "case1",
+    "case2",
+    "case3",
+    "case4",
+    "case5",
+    "case6",
+    "div5",
+    "rules",
+    "record",
+    "lab",
+    "lab-detail",
+    "closing"
+  ],
+  "sections": {
+    "intro": {
+      "description": "도입: 결과물과 오늘의 여정",
+      "start": "cover"
+    },
+    "s1": {
+      "description": "I 방법론: 사람과 Claude Code의 역할을 나누는 10단계",
+      "start": "div1"
+    },
+    "s2": {
+      "description": "II 마스터 프롬프트와 설계: 로드맵을 주고 범위를 좁힌다",
+      "start": "div2"
+    },
+    "s3": {
+      "description": "III 프롬프트 여정: P04부터 P18까지",
+      "start": "div3"
+    },
+    "s4": {
+      "description": "IV 자체 검증 루프: 실제 사례 6개",
+      "start": "div4"
+    },
+    "s5": {
+      "description": "V 규칙·기록·실습",
+      "start": "div5"
+    }
+  },
+  "faces": {
+    "freesentation-4-regular": {
+      "family": "Freesentation 4 Regular",
+      "src": "/_blob/ad8adfde984509416f2e396502864587"
+    },
+    "freesentation-7-bold": {
+      "family": "Freesentation 7 Bold",
+      "src": "/_blob/1417cbc596ac7676e7e63dd2ca0ea7cd"
+    },
+    "source-code-pro": {
+      "family": "Source Code Pro",
+      "href": "https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400&display=swap"
+    }
+  },
+  "designSystems": []
+}

@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1664" height="620" viewBox="0 0 1664 620" font-family="Freesentation" font-size="26">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#17253F"/>
+    </marker>
+  </defs>
+  <rect width="1664" height="620" fill="#F7F6F1"/>
+
+  <!-- 그룹 라벨 -->
+  <text x="341" y="44" text-anchor="middle" font-weight="700" font-size="28" fill="#6B7280">가상 공장 · 데이터 생성</text>
+  <line x1="50" y1="62" x2="632" y2="62" stroke="#6B7280" stroke-width="2"/>
+  <text x="1323" y="44" text-anchor="middle" font-weight="700" font-size="28" fill="#6B7280">데이터 플랫폼 · 처리와 표시</text>
+  <line x1="1032" y1="62" x2="1614" y2="62" stroke="#6B7280" stroke-width="2"/>
+
+  <!-- 1 시뮬레이터 -->
+  <rect x="50" y="90" width="270" height="240" rx="16" fill="#17253F"/>
+  <text x="185" y="150" text-anchor="middle" font-weight="700" font-size="32" fill="#F7F6F1">시뮬레이터</text>
+  <text x="185" y="200" text-anchor="middle" fill="#BFC8D6">설비 동작 · 마모</text>
+  <text x="185" y="238" text-anchor="middle" fill="#BFC8D6">AGV · 트럭 · 오더</text>
+  <text x="185" y="290" text-anchor="middle" font-size="24" fill="#8A96AB">순수 TypeScript</text>
+  <line x1="324" y1="210" x2="356" y2="210" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <!-- 2 가상 공장 -->
+  <rect x="362" y="90" width="270" height="240" rx="16" fill="#1F3255"/>
+  <text x="497" y="150" text-anchor="middle" font-weight="700" font-size="32" fill="#F7F6F1">가상 공장</text>
+  <text x="497" y="200" text-anchor="middle" fill="#BFC8D6">센서 1초 샘플</text>
+  <text x="497" y="238" text-anchor="middle" fill="#BFC8D6">설비 이벤트 발행</text>
+  <text x="497" y="290" text-anchor="middle" font-size="24" fill="#8A96AB">약 1,000건/분</text>
+  <line x1="636" y1="210" x2="668" y2="210" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <!-- 3 메시지 버스 -->
+  <rect x="674" y="90" width="316" height="240" rx="16" fill="#FBEBCF" stroke="#F0A429" stroke-width="4"/>
+  <text x="832" y="150" text-anchor="middle" font-weight="700" font-size="32" fill="#17253F">메시지 버스</text>
+  <text x="832" y="200" text-anchor="middle" fill="#3D4757">MQTT식 토픽</text>
+  <text x="832" y="240" text-anchor="middle" font-size="24" fill="#3D4757">f01/라인/자산/</text>
+  <text x="832" y="272" text-anchor="middle" font-size="24" fill="#3D4757">telemetry · event</text>
+  <line x1="994" y1="210" x2="1026" y2="210" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <!-- 4 처리기 -->
+  <rect x="1032" y="90" width="270" height="240" rx="16" fill="#FEFEFB" stroke="#17253F" stroke-width="3"/>
+  <text x="1167" y="150" text-anchor="middle" font-weight="700" font-size="32" fill="#17253F">데이터 처리기</text>
+  <text x="1167" y="200" text-anchor="middle" fill="#3D4757">시계열 · 알람</text>
+  <text x="1167" y="238" text-anchor="middle" fill="#3D4757">OEE · 예지 보전</text>
+  <text x="1167" y="276" text-anchor="middle" fill="#3D4757">납기 · 재고</text>
+  <line x1="1306" y1="210" x2="1338" y2="210" stroke="#17253F" stroke-width="4" marker-end="url(#arrow)"/>
+
+  <!-- 5 UI -->
+  <rect x="1344" y="90" width="270" height="240" rx="16" fill="#FEFEFB" stroke="#17253F" stroke-width="3"/>
+  <text x="1479" y="150" text-anchor="middle" font-weight="700" font-size="32" fill="#17253F">UI 패널</text>
+  <text x="1479" y="200" text-anchor="middle" fill="#3D4757">초당 4번 스냅샷</text>
+  <text x="1479" y="238" text-anchor="middle" fill="#3D4757">KPI · 차트 · 알람</text>
+
+  <!-- 3D 장면 -->
+  <line x1="185" y1="334" x2="185" y2="430" stroke="#17253F" stroke-width="3" stroke-dasharray="10 8" marker-end="url(#arrow)"/>
+  <rect x="50" y="436" width="582" height="140" rx="16" fill="#EDF0F5"/>
+  <text x="80" y="492" font-weight="700" font-size="30" fill="#17253F">3D 장면</text>
+  <text x="80" y="536" fill="#3D4757">매 프레임 시뮬레이터 상태를 직접 읽기 · 60 FPS</text>
+
+  <!-- 교체 지점 -->
+  <line x1="832" y1="334" x2="832" y2="430" stroke="#F0A429" stroke-width="3" marker-end="url(#arrow)"/>
+  <rect x="674" y="436" width="940" height="140" rx="16" fill="#FEFEFB" stroke="#F0A429" stroke-width="3" stroke-dasharray="10 8"/>
+  <text x="704" y="492" font-weight="700" font-size="30" fill="#17253F">실데이터로 바꿀 때 교체하는 지점</text>
+  <text x="704" y="536" fill="#3D4757">버스에 MQTT·WebSocket을 연결하면 처리기와 UI는 그대로 사용</text>
+</svg>
